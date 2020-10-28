@@ -4,14 +4,16 @@ from app import app
 from datetime import datetime
 from bson import json_util
 
+
 class User():
     def __init__(self, id):
+        self.id = id
         self.username = None
         self.email = None
-        self.id = id
         self.password_hash = None
         self.cart_list = []
         self.buy_list = []
+        self.sell_list = []
 
     def is_authenticated(self):
         return True
@@ -41,23 +43,59 @@ class User():
         userObj.username = user['username']
         userObj.email = user['email']
         userObj.password_hash = user['password_hash']
+        userObj.cart_list = user['cart_list']
+        userObj.buy_list = user['buy_list']
+        userObj.sell_list = user['sell_list']
+
         return userObj
 
     def save(self):
         self.id = app.mongo.db.user.insert({
-                "username": self.username,
-                "password_hash": self.password_hash,
-                "email": self.email,
-                "createtedAt": datetime.now()
-            })
+            "username": self.username,
+            "password_hash": self.password_hash,
+            "email": self.email,
+            "createtedAt": datetime.now(),
+            "cart_list": self.cart_list,
+            "buy_list": self.buy_list,
+            "sell_list": self.sell_list
+        })
         if self.id:
             return True
         else:
             return False
 
-class Collector(User):
-    def __init__(self):
-        self.sell_list = []
-    
-    def add_item(self,item_id):
-        self.sell_list.append(item_id)
+
+class Product():
+    def __init__(self, id, name, image_urls, description, price):
+        self.id = id
+        self.name = name
+        self.image_urls = []
+        self.description = None
+        self.price = 0
+        self.owner = None
+
+    @staticmethod
+    def build_product(product):
+        productObj = Product(json_util.dumps(product['_id']))
+        productObj.name = product['name']
+        productObj.image_urls = product['image_urls']
+        productObj.description = product['description']
+        productObj.price = product['price']
+        productObj.owner = product['owner']
+        return productObj
+
+    def setOwner(ownerId):
+        self.owner = ownerId
+
+    def save(self):
+        self.id = app.mongo.db.product.insert({
+            "name": self.name,
+            "image_urls": self.image_urls,
+            "description": self.description,
+            "price": self.price,
+            "owner": self.owner
+        })
+        if self.id:
+            return True
+        else:
+            return False
