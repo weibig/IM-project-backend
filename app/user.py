@@ -1,5 +1,4 @@
 from werkzeug.security import check_password_hash, generate_password_hash
-from passlib.apps import custom_app_context as pwd_context
 from app import app
 from datetime import datetime
 from bson import json_util
@@ -69,13 +68,13 @@ class Product():
     def __init__(self, id, name, image_urls, description, price):
         self.id = id
         self.name = name
-        self.image_urls = []
-        self.description = None
-        self.price = 0
+        self.image_urls = image_urls
+        self.description = description
+        self.price = price
         self.owner = None
 
     @staticmethod
-    def build_product(product):
+    def build_product(self,product):
         productObj = Product(json_util.dumps(product['_id']))
         productObj.name = product['name']
         productObj.image_urls = product['image_urls']
@@ -84,7 +83,7 @@ class Product():
         productObj.owner = product['owner']
         return productObj
 
-    def setOwner(ownerId):
+    def setOwner(self,ownerId):
         self.owner = ownerId
 
     def save(self):
@@ -93,7 +92,7 @@ class Product():
             "image_urls": self.image_urls,
             "description": self.description,
             "price": self.price,
-            "owner": self.owner
+            "owner": self.owner #userId
         })
         if self.id:
             return True

@@ -15,30 +15,31 @@ def login():
     }
     username = request.json.get('username')
     password = request.json.get('password')
-    if username and password:
-        user = app.mongo.db.user.find_one({"username": username})
-        if user and User.validate_login(user["password_hash"], password):
-            user_obj = User.build_user(user)
-            if login_user(user_obj):
-                userSession = {
-                    'userId': user['_id'],
-                    'session_id': session["_id"],
+
+    if username is None or password is None or username == "" or password == "":
+        response["response"] = "username or password is not provided"
+        return make_response(json.dumps(response), 400)
+
+    user = app.mongo.db.user.find_one({"username": username})
+    if user and User.validate_login(user["password_hash"], password):
+        user_obj = User.build_user(user)
+        if login_user(user_obj):
+            userSession = {
+                'userId': user['_id'],
+                'session_id': session["_id"],
+            }
+            app.mongo.db.session.insert(userSession)
+            app.mongo.db.session.update({
+                "userId": ObjectId(user['_id'])
+            },
+                {
+                "$set": {
+                    "session_id": session['_id']
                 }
-                app.mongo.db.session.insert(userSession)
-                app.mongo.db.session.update({
-                    "userId": ObjectId(user['_id'])
-                },
-                    {
-                    "$set": {
-                        "session_id": session['_id']
-                    }
-                }, upsert=True)
-                return make_response(json_util.dumps(userSession), 200)
-        else:
-            response["response"] = "Worng password"
-            return make_response(json.dumps(response), 400)
+            }, upsert=True)
+            return make_response(json_util.dumps(userSession), 200)
     else:
-        response["response"] = "Username or password not entered"
+        response["response"] = "Worng password"
         return make_response(json.dumps(response), 400)
 
 
@@ -118,7 +119,7 @@ def register():
     email = request.json.get('email')
 
     if username is None or password is None or username == "" or password == "":
-        response["response"] = "username or password not provided"
+        response["response"] = "username or password is not provided"
         return make_response(json.dumps(response), 400)
 
     if app.mongo.db.user.find_one({"username": username}):
@@ -132,9 +133,9 @@ def register():
 
     if user.save():
         response["response"] = "User saved"
-        response["userId"] = user["_id"]
+        response["userId"] = user.id
         response = json.dumps(response, default=json_util.default)
-    return make_response(json.dumps(response), 200)
+    return make_response(response, 200)
 
 
 @app.route('/addChart', methods=['POST'])
@@ -146,6 +147,10 @@ def add_to_cart():
     item_id = request.json.get('item_id')
     api_key = request.headers.get('Authorization')
 
+    if item_id is None:
+        response["response"] = "Item ID is not provided"
+        return make_response(json.dumps(response), 400)
+
     if api_key:
         api_key = api_key.replace('Basic ', '', 1)
         try:
@@ -155,10 +160,10 @@ def add_to_cart():
         userFromSession = app.mongo.db.session.find_one(
             {"session_id": api_key})
         if userFromSession:
-            add_item = app.mongo.db.session.update({'_id': userFromSession['_id']}, {
-                                                   "$push": {"cart_list": [item_id]}})
+            add_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
+                                                   "$push": {"cart_list": item_id}})
             if add_item:
-                response['response'] = "Added complete"
+                response['response'] = "Add chart complete"
             else:
                 status_code = 400
                 response['response'] = "Something went wrong"
@@ -169,44 +174,29 @@ def add_to_cart():
         response['response'] = "Authorization error"
     return make_response(json.dumps(response), status_code)
 
-# add item to his selling list
-
-
+# add item to his sell list
 @app.route('/addProduct', methods=['POST'])
-def add_to_selling_list():
-    response = {
-        "response": ""
-    }
+def add_to_sell_list():
+    response = {}
     status_code = 200
+    
     # user info
     api_key = request.headers.get('Authorization')
 
     # item info
     name = request.json.get('name')
-    image_urls = request.json.get('image_urls')
-    description = request.json.get('description')
+    image_urls = (request.json.get('image_urls') if request.json.get('image_urls') else [])
+    description = (request.json.get('description') if request.json.get('description') else "")
     price = request.json.get('price')
 
     # create item
-
     if name is None or price is None or name == "" or price == "":
         response["response"] = "item's name or price is not provided"
         return make_response(json.dumps(response), 400)
 
-    if app.mongo.db.product.find_one({"name": name}):
-        response["response"] = "item name has been used by this user"
-        return make_response(json.dumps(response), 400)
-
-    user = Product("")
-    user.username = username
-    user.hash_password(password=password)
-    user.set_email(email=email)
-
-    if user.save():
-        response["response"] = "User saved"
-        response["userId"] = user["_id"]
-        response = json.dumps(response, default=json_util.default)
-
+    product = Product(id="",name=name,image_urls=image_urls,description=description,price=price)
+    
+    #check user auth
     if api_key:
         api_key = api_key.replace('Basic ', '', 1)
         try:
@@ -216,45 +206,96 @@ def add_to_selling_list():
         userFromSession = app.mongo.db.session.find_one(
             {"session_id": api_key})
         if userFromSession:
-            add_item = app.mongo.db.session.update({'_id': userFromSession['_id']}, {
-                                                   "$push": {"sell_list": [item_id]}})
-            if add_item:
-                response['response'] = "Added complete"
+            if app.mongo.db.product.find_one({"name": name, "owner": userFromSession['userId']}):
+                response["response"] = "item name has been used by this user"
+                return make_response(json.dumps(response), 400)
+            product.setOwner(userFromSession['userId'])
+
+            # save product + store in user's sell list
+            if product.save():
+                response["product_response"] = "product saved"
+                response["productId"] = product.id
+                # response = json.dumps(response, default=json_util.default)
+                
+                add_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
+                                                   "$push": {"sell_list": product.id}})
+                if add_item:
+                    response['response'] = "Add product complete"
+                else:
+                    status_code = 400
+                    response['response'] = "Add product to user's sell list error"
+                
             else:
                 status_code = 400
-                response['response'] = "Something went wrong"
+                response['response'] = "Add product error"
         else:
             response['response'] = "User has not logged in"
     else:
         status_code = 400
         response['response'] = "Authorization error"
-    return make_response(json.dumps(response), status_code)
-
-
-# all selling item from certain collector
-@app.route('/sellList', methods=['POST'])
-def get_sell_list():
-    response = {
-        "response": ""
-    }
-    offset = request.json.get('offset')
-    length = request.json.get('length')
-    userId = request.json.get('userId')  # collector's user id
-
-    checkUser = app.mongo.db.user.find_one({"id": userId})
-    if checkUser:
-        sell_list = checkUser['sell_list'][offset:offset+length]
-        response["sell_list"] = sell_list
-        response["total_length"] = len(checkUser['sell_list'])
-        response["response"] = "successful"
-        return make_response(json.dumps(response), 200)
-    else:
-        response["response"] = "User ID not found"
-        return make_response(json.dumps(response), 400)
+    
+    return make_response(json.dumps(response, default=json_util.default), status_code)
 
 
 @app.route('/allCollector', methods=['POST'])  # collector list
 def get_all_collector():
-    offset = request.json.get('offset')
-    length = request.json.get('length')
-    checkCollector = app.mongo.db.user.find({$expr: "this.sell_list.length > 0"})
+    collectors = []
+    offset = int(request.json.get('offset')) if request.json.get('offset') else 0
+    length = int(request.json.get('length')) if request.json.get('length') else 0
+    for r in app.mongo.db.user.find({"sell_list.0": {"$exists": "true"}}):
+        collectors.append(r['_id'])
+
+    if offset > len(collectors):
+        response = {"response": "invalid offset"}
+        return make_response(json.dumps(response), 400)
+
+    if offset+length > len(collectors) or length == 0:
+        collectors = collectors[offset:]
+    else:
+        collectors = collectors[offset:offset+length]
+
+    response = {"collectors": collectors, "response": "successful"}
+    return make_response(json.dumps(response, default=json_util.default), 200)
+    
+@app.route('/userInfo', methods=['POST'])
+def get_user_info():
+    response = {}
+    userId = request.json.get('userId')
+    
+    if userId is None:
+        response["response"] = "User ID is not provided"
+        return make_response(json.dumps(response), 400)
+
+    checkUser = app.mongo.db.user.find_one({"_id": ObjectId(userId)})
+    if checkUser:
+        response["email"] = checkUser["email"]
+        response["cart_list"] = checkUser["cart_list"]
+        response["sell_list"] = checkUser["sell_list"]
+        response["buy_list"] = checkUser["buy_list"]
+        response["response"] = "successful"
+        return make_response(json.dumps(response,default=json_util.default), 200)
+    
+    response["response"] = "User ID is not found"
+    return make_response(json.dumps(response), 400)
+
+@app.route('/itemInfo', methods=['POST'])
+def get_item_info():
+    response = {}
+    itemId = request.json.get('itemId')
+    
+    if itemId is None:
+        response["response"] = "Product ID is not provided"
+        return make_response(json.dumps(response), 400)
+
+    checkProduct = app.mongo.db.product.find_one({"_id": ObjectId(itemId)})
+    if checkProduct:
+        response["name"] = checkProduct["name"]
+        response["image_urls"] = checkProduct["image_urls"]
+        response["description"] = checkProduct["description"]
+        response["price"] = checkProduct["price"]
+        response["owner"] = checkProduct["owner"]
+        response["response"] = "successful"
+        return make_response(json.dumps(response,default=json_util.default), 200)
+    
+    response["response"] = "Product ID is not found"
+    return make_response(json.dumps(response), 400)
