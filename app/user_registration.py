@@ -128,3 +128,43 @@ def new_user():
         response["userId"] = user.id
         response = json.dumps(response, default=json_util.default)
     return make_response(json.dumps(response), 200)
+
+
+@app.route('/addItem', methods=['POST'])
+def add_to_cart():
+    item_id = request.json.get('item_id')
+    api_key = request.headers.get('Authorization')
+
+    if api_key:
+        api_key = api_key.replace('Basic ', '', 1)
+        try:
+            api_key = base64.b64decode(api_key).decode('utf-8')
+        except TypeError:
+            pass
+        userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
+        if userFromSession:
+            add_item = app.mongo.db.session.update({'_id': userFromSession['_id']}, {"$push": {"cart_list":[item_id]}})
+            if add_item:
+                status_code = 200
+                response['response'] = "Added complete"
+            else:
+                status_code = 400
+                response['response'] = "Something went wrong"
+        else:
+            status_code = 200
+            response['response'] = "User has not logged in"
+
+# all item from certain collector
+@app.route('/allItem', methods=['POST'])
+def get_all_item():
+    offset = request.json.get('offset')
+    length = request.json.get('length')
+    collector = request.json.get('collector_id')
+
+# collector list
+@app.route('/allCollector', methods=['POST'])
+def get_all_collector():
+    offset = request.json.get('offset')
+    length = request.json.get('length')
+
+

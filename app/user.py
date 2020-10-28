@@ -5,12 +5,13 @@ from datetime import datetime
 from bson import json_util
 
 class User():
-
     def __init__(self, id):
         self.username = None
         self.email = None
         self.id = id
         self.password_hash = None
+        self.cart_list = []
+        self.buy_list = []
 
     def is_authenticated(self):
         return True
@@ -53,3 +54,10 @@ class User():
             return True
         else:
             return False
+
+class Collector(User):
+    def __init__(self):
+        self.sell_list = []
+    
+    def add_item(self,item_id):
+        self.sell_list.append(item_id)
