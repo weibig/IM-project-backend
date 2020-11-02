@@ -1,7 +1,7 @@
 from app import app, lm
 from flask import request, session, make_response
 from flask_login import login_user, logout_user, login_required
-from .user import User, Product
+from .models import User, Product
 from bson import json_util, ObjectId
 import json
 import base64
