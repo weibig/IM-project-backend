@@ -160,8 +160,13 @@ def add_to_cart():
         userFromSession = app.mongo.db.session.find_one(
             {"session_id": api_key})
         if userFromSession:
-            add_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
-                                                   "$push": {"cart_list": item_id}})
+            add_item = app.mongo.db.user.findAndModify({
+                "query": { '_id': userFromSession['userId'] },
+                "update": { "$inc": { "cart_list."+item_id: 1 } },
+                "upsert": "true"
+            })
+            # add_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
+            #                                        "$push": {"cart_list": item_id}})
             if add_item:
                 response['response'] = "Add chart complete"
             else:
@@ -174,9 +179,49 @@ def add_to_cart():
         response['response'] = "Authorization error"
     return make_response(json.dumps(response), status_code)
 
+@app.route('/removeChart', methods=['POST'])
+def remove_to_cart():
+    response = {
+        "response": ""
+    }
+    status_code = 200
+    item_id = request.json.get('item_id')
+    api_key = request.headers.get('Authorization')
+
+    if item_id is None:
+        response["response"] = "Item ID is not provided"
+        return make_response(json.dumps(response), 400)
+
+    if api_key:
+        api_key = api_key.replace('Basic ', '', 1)
+        try:
+            api_key = base64.b64decode(api_key).decode('utf-8')
+        except TypeError:
+            pass
+        userFromSession = app.mongo.db.session.find_one(
+            {"session_id": api_key})
+        if userFromSession:
+            remove_item = app.mongo.db.user.findAndModify({
+                "query": { '_id': userFromSession['userId'] },
+                "update": { "$inc": { "cart_list."+item_id: -1 } }
+            })
+            # remove_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
+            #                                        "$pull": {"cart_list": item_id}})
+            if remove_item:
+                response['response'] = "Remove chart complete"
+            else:
+                status_code = 400
+                response['response'] = "Something went wrong"
+        else:
+            response['response'] = "User has not logged in"
+    else:
+        status_code = 400
+        response['response'] = "Authorization error"
+    return make_response(json.dumps(response), status_code)
+
 # add item to his sell list
 @app.route('/addProduct', methods=['POST'])
-def add_to_sell_list():
+def add_product():
     response = {}
     status_code = 200
     
@@ -185,8 +230,8 @@ def add_to_sell_list():
 
     # item info
     name = request.json.get('name')
-    image_urls = (request.json.get('image_urls') if request.json.get('image_urls') else [])
-    description = (request.json.get('description') if request.json.get('description') else "")
+    image_urls = request.json.get('image_urls',default=[])
+    description = request.json.get('description',default="")
     price = request.json.get('price')
 
     # create item
@@ -206,9 +251,6 @@ def add_to_sell_list():
         userFromSession = app.mongo.db.session.find_one(
             {"session_id": api_key})
         if userFromSession:
-            if app.mongo.db.product.find_one({"name": name, "owner": userFromSession['userId']}):
-                response["response"] = "item name has been used by this user"
-                return make_response(json.dumps(response), 400)
             product.setOwner(userFromSession['userId'])
 
             # save product + store in user's sell list
@@ -217,8 +259,14 @@ def add_to_sell_list():
                 response["productId"] = product.id
                 # response = json.dumps(response, default=json_util.default)
                 
-                add_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
-                                                   "$push": {"sell_list": product.id}})
+                add_item = app.mongo.db.user.findAndModify({
+                    "query": { '_id': userFromSession['userId'] },
+                    "update": { "$inc": { "sell_list."+product.id: 1 } },
+                    "upsert": "true"
+                })
+                # add_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
+                #                                    "$push": {"sell_list": product.id}})
+                                                   
                 if add_item:
                     response['response'] = "Add product complete"
                 else:
@@ -235,6 +283,100 @@ def add_to_sell_list():
         response['response'] = "Authorization error"
     
     return make_response(json.dumps(response, default=json_util.default), status_code)
+
+# revise item to his sell list
+@app.route('/reviseProduct', methods=['POST'])
+def revise_product():
+    response = {}
+    status_code = 200
+    
+    # user info
+    api_key = request.headers.get('Authorization')
+
+    # item info
+    item_id = request.json.get('item_id')
+    name = request.json.get('name')
+    image_urls = request.json.get('image_urls')
+    description = request.json.get('description')
+    price = request.json.get('price')
+
+    # create item
+    if item_id is None:
+        response["response"] = "item's id is not provided"
+        return make_response(json.dumps(response), 400)
+    
+    #check user auth
+    if api_key:
+        api_key = api_key.replace('Basic ', '', 1)
+        try:
+            api_key = base64.b64decode(api_key).decode('utf-8')
+        except TypeError:
+            pass
+        userFromSession = app.mongo.db.session.find_one(
+            {"session_id": api_key})
+        isOwner = app.mongo.db.product.find_one({"_id": item_id, "owner": userFromSession['userId']})
+        if userFromSession and isOwner:
+            ### TODO update method
+            revise_item = app.mongo.db.product.findAndModify({
+                "query": { '_id': item_id },
+                "update": {'name': name, }
+            })                                  
+            if revise_item:
+                response['response'] = "Revise product complete"
+            else:
+                status_code = 400
+                response['response'] = "Revise product error"
+        else:
+            response['response'] = "User has no authentication"
+    else:
+        status_code = 400
+        response['response'] = "Authorization error"
+    
+    return make_response(json.dumps(response, default=json_util.default), status_code)
+
+# remove item from his sell list
+@app.route('/removeProduct', methods=['POST'])
+def remove_product():
+    response = {
+        "response": ""
+    }
+    status_code = 200
+    item_id = request.json.get('item_id')
+    api_key = request.headers.get('Authorization')
+
+    if item_id is None:
+        response["response"] = "Item ID is not provided"
+        return make_response(json.dumps(response), 400)
+
+    if api_key:
+        api_key = api_key.replace('Basic ', '', 1)
+        try:
+            api_key = base64.b64decode(api_key).decode('utf-8')
+        except TypeError:
+            pass
+        userFromSession = app.mongo.db.session.find_one(
+            {"session_id": api_key})
+        isOwner = app.mongo.db.product.find_one({"_id": item_id, "owner": userFromSession['userId']})
+        if userFromSession and isOwner:
+            remove_from_sell_list = app.mongo.db.user.findAndModify({
+                "query": { '_id': userFromSession['userId'] },
+                "update": { "$inc": { "sell_list."+item_id: -1 } }
+            })
+            remove_item = app.mongo.db.product.remove({"_id": item_id})
+
+            # remove_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
+            #                                        "$pull": {"sell_list": item_id}})
+            if remove_from_sell_list and remove_item:
+                response['response'] = "Remove product complete"
+            else:
+                status_code = 400
+                response['response'] = "Something went wrong"
+        else:
+            response['response'] = "User has no authentication"
+    else:
+        status_code = 400
+        response['response'] = "Authorization error"
+    return make_response(json.dumps(response), status_code)
 
 
 @app.route('/allCollector', methods=['POST'])  # collector list
