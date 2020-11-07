@@ -5,6 +5,7 @@ from .models import User, Product
 from bson import json_util, ObjectId
 import json
 import base64
+import uuid
 import logging
 
 
@@ -21,15 +22,17 @@ def login():
     user = app.mongo.db.user.find_one({"username": username})
     if user and User.validate_login(user["password_hash"], password):
         user_obj = User.build_user(user)
+        session['uid'] = str(uuid.uuid4())
         if login_user(user_obj):
             userSession = {
                 "userId": user["_id"],
-                "session_id": session["_id"],
+                "session_id": session["uid"],
+                "api_key": session["uid"].encode("utf-8")
             }
             app.mongo.db.session.insert(userSession)
             app.mongo.db.session.update(
                 {"userId": ObjectId(user["_id"])},
-                {"$set": {"session_id": session["_id"]}},
+                {"$set": {"session_id": session["uid"]}},
                 upsert=True,
             )
             return make_response(json_util.dumps(userSession), 200)
@@ -38,7 +41,7 @@ def login():
         return make_response(json.dumps(response), 400)
 
 
-@app.route("/logout")
+@app.route("/logout", methods=["POST"])
 def logout():
 
     response = {"response": ""}
@@ -52,7 +55,7 @@ def logout():
         userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
         if userFromSession:
             deleteUser = app.mongo.db.session.remove(
-                {"_id": userFromSession["_id"]}, True
+                {"_id": userFromSession["uid"]}, True
             )
             if deleteUser:
                 status_code = 200
@@ -80,7 +83,7 @@ def load_user_from_request(request):
     if api_key:
         api_key = api_key.replace("Basic ", "", 1)
         try:
-            api_key = base64.b64decode(api_key)
+            api_key = base64.b64decode(api_key).decode("utf-8")
         except TypeError:
             pass
         userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
@@ -125,7 +128,8 @@ def register():
     return make_response(response, 200)
 
 
-@app.route("/addChart", methods=["POST"])
+@app.route("/addCart", methods=["POST"])
+@login_required
 def add_to_cart():
     response = {"response": ""}
     status_code = 200
@@ -142,16 +146,17 @@ def add_to_cart():
         except TypeError:
             pass
         userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
+        # return make_response(json.dumps({"re":str(userFromSession["userId"])}), status_code)
         if userFromSession:
             add_item = app.mongo.db.user.find_one_and_update(
                 filter={"_id": userFromSession["userId"]},
-                update={"$inc": {"cart_list." + str(ObjectId(item_id)): 1}},
+                update={"$inc": {"cart_list." + item_id: 1}},
                 upsert=True,
             )
             # add_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
             #                                        "$push": {"cart_list": item_id}})
             if add_item:
-                response["response"] = "Add chart complete"
+                response["response"] = "Add cart complete"
             else:
                 status_code = 400
                 response["response"] = "Something went wrong"
@@ -164,7 +169,8 @@ def add_to_cart():
     return make_response(json.dumps(response), status_code)
 
 
-@app.route("/removeChart", methods=["POST"])
+@app.route("/removeCart", methods=["POST"])
+@login_required
 def remove_to_cart():
     response = {"response": ""}
     status_code = 200
@@ -184,13 +190,13 @@ def remove_to_cart():
         userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
         if userFromSession:
             remove_item = app.mongo.db.user.find_one_and_update(
-                filter={"_id": userFromSession["userId"]},
-                update={"$inc": {"cart_list." + str(ObjectId(item_id)): -1}},
+                filter={"_id": userFromSession["userId"], "cart_list."+ item_id: {"$gt":0}},
+                update={"$inc": {"cart_list." + item_id: -1}},
             )
             # remove_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
             #                                        "$pull": {"cart_list": item_id}})
             if remove_item:
-                response["response"] = "Remove chart complete"
+                response["response"] = "Remove cart complete"
             else:
                 status_code = 400
                 response["response"] = "Something went wrong"
@@ -205,6 +211,7 @@ def remove_to_cart():
 
 # add item to his sell list
 @app.route("/addProduct", methods=["POST"])
+@login_required
 def add_product():
     response = {}
     status_code = 200
@@ -278,6 +285,7 @@ def add_product():
 
 # revise item to his sell list
 @app.route("/reviseProduct", methods=["POST"])
+@login_required
 def revise_product():
     response = {}
     status_code = 200
@@ -316,9 +324,12 @@ def revise_product():
         except TypeError:
             pass
         userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
-        isOwner = app.mongo.db.product.find_one(
-            {"_id": item_id, "owner": userFromSession["userId"]}
-        )
+        if userFromSession:
+            isOwner = app.mongo.db.product.find_one(
+                {"_id": item_id, "owner": userFromSession["userId"]}
+            )
+        else:
+            isOwner = False
         if userFromSession and isOwner:
             revise_item = app.mongo.db.product.find_one_and_update(
                 filter={"_id": item_id}, update={"$set": updated_item}
@@ -339,6 +350,7 @@ def revise_product():
 
 # remove item from his sell list
 @app.route("/removeProduct", methods=["POST"])
+@login_required
 def remove_product():
     response = {"response": ""}
     status_code = 200
@@ -356,13 +368,16 @@ def remove_product():
         except TypeError:
             pass
         userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
-        isOwner = app.mongo.db.product.find_one(
-            {"_id": item_id, "owner": userFromSession["userId"]}
-        )
+        if userFromSession:
+            isOwner = app.mongo.db.product.find_one(
+                {"_id": item_id, "owner": userFromSession["userId"]}
+            )
+        else:
+            isOwner = False
         if userFromSession and isOwner:
             remove_from_sell_list = app.mongo.db.user.find_one_and_update(
-                filter={"_id": userFromSession["userId"]},
-                update={"$inc": {"sell_list." + str(item_id): -1}},
+                filter={"_id": userFromSession["userId"], "sell_list."+ str(item_id): {"$gt":0}},
+                update={"$unset": {"sell_list." + str(item_id): 1}},
             )
             remove_item = app.mongo.db.product.remove({"_id": item_id})
 
@@ -374,14 +389,14 @@ def remove_product():
                 status_code = 400
                 response["response"] = "Something went wrong"
         else:
-            response["response"] = "User has no authentication"
+            response["response"] = "User has no authentication, you are "+ str(userFromSession["userId"])
     else:
         status_code = 400
         response["response"] = "Authorization error"
     return make_response(json.dumps(response), status_code)
 
 
-@app.route("/allCollector", methods=["POST"])  # collector list
+@app.route("/allCollector", methods=["GET"])  # collector list
 def get_all_collector():
     collectors = []
     offset = int(request.json.get("offset")) if request.json.get("offset") else 0
@@ -402,7 +417,7 @@ def get_all_collector():
     return make_response(json.dumps(response, default=json_util.default), 200)
 
 
-@app.route("/userInfo", methods=["POST"])
+@app.route("/userInfo", methods=["GET"])
 def get_user_info():
     response = {}
     userId = request.json.get("userId")
@@ -424,7 +439,7 @@ def get_user_info():
     return make_response(json.dumps(response), 400)
 
 
-@app.route("/itemInfo", methods=["POST"])
+@app.route("/itemInfo", methods=["GET"])
 def get_item_info():
     response = {}
     itemId = request.json.get("itemId")
