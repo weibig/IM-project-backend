@@ -1,4 +1,6 @@
-## Start Mongo BD
+# IM-project-backend
+
+## Start MongoDB
 ```
 mongod --dbpath ./db/data
 ```
@@ -7,7 +9,7 @@ mongod --dbpath ./db/data
 ```
 python3 -m venv env
 source env/bin/activate
+pip install -r requirements.txt
 python3 run.py
 ```
-
 
