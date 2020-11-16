@@ -1,12 +1,13 @@
 from flask import Flask
 from flask_pymongo import PyMongo
 from flask_login import LoginManager
+import os
 
 app = Flask(__name__)
 
 lm = LoginManager()
 lm.init_app(app)
-app.secret_key = "password"
+app.secret_key = os.getenv(MONGO_INITDB_ROOT_PASSWORD)
 
 app.config["MONGO_URI"] = "mongodb://127.0.0.1:27017/test"
 app.mongo = PyMongo(app)
