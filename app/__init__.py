@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 lm = LoginManager()
 lm.init_app(app)
-app.secret_key = os.getenv(MONGO_INITDB_ROOT_PASSWORD)
+app.secret_key = "password"  # os.getenv("MONGO_INITDB_ROOT_PASSWORD")
 
 app.config["MONGO_URI"] = "mongodb://127.0.0.1:27017/test"
 app.mongo = PyMongo(app)
@@ -26,6 +26,6 @@ app.APP_URL = "http://127.0.0.1:5000"
 #     })
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, threaded=True)
 
 from app import views

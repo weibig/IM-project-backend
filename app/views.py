@@ -22,12 +22,12 @@ def login():
     user = app.mongo.db.user.find_one({"username": username})
     if user and User.validate_login(user["password_hash"], password):
         user_obj = User.build_user(user)
-        session['uid'] = str(uuid.uuid4())
+        session["uid"] = str(uuid.uuid4())
         if login_user(user_obj):
             userSession = {
                 "userId": user["_id"],
                 "session_id": session["uid"],
-                "api_key": session["uid"].encode("utf-8")
+                "api_key": session["uid"].encode("utf-8"),
             }
             app.mongo.db.session.insert(userSession)
             app.mongo.db.session.update(
@@ -119,6 +119,7 @@ def register():
     user = User("")
     user.username = username
     user.hash_password(password=password)
+    user.wallet_address = new_wallet()  # TODO
     user.set_email(email=email)
 
     if user.save():
@@ -146,15 +147,12 @@ def add_to_cart():
         except TypeError:
             pass
         userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
-        # return make_response(json.dumps({"re":str(userFromSession["userId"])}), status_code)
         if userFromSession:
             add_item = app.mongo.db.user.find_one_and_update(
                 filter={"_id": userFromSession["userId"]},
                 update={"$inc": {"cart_list." + item_id: 1}},
                 upsert=True,
             )
-            # add_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
-            #                                        "$push": {"cart_list": item_id}})
             if add_item:
                 response["response"] = "Add cart complete"
             else:
@@ -190,11 +188,12 @@ def remove_to_cart():
         userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
         if userFromSession:
             remove_item = app.mongo.db.user.find_one_and_update(
-                filter={"_id": userFromSession["userId"], "cart_list."+ item_id: {"$gt":0}},
+                filter={
+                    "_id": userFromSession["userId"],
+                    "cart_list." + item_id: {"$gt": 0},
+                },
                 update={"$inc": {"cart_list." + item_id: -1}},
             )
-            # remove_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
-            #                                        "$pull": {"cart_list": item_id}})
             if remove_item:
                 response["response"] = "Remove cart complete"
             else:
@@ -254,15 +253,12 @@ def add_product():
             if product.save():
                 response["product_response"] = "product saved"
                 response["productId"] = product.id
-                # response = json.dumps(response, default=json_util.default)
 
                 add_item = app.mongo.db.user.find_one_and_update(
                     filter={"_id": userFromSession["userId"]},
                     update={"$inc": {"sell_list." + str(product.id): 1}},
                     upsert=True,
                 )
-                # add_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
-                #                                    "$push": {"sell_list": product.id}})
 
                 if add_item:
                     response["response"] = "Add product complete"
@@ -299,6 +295,7 @@ def revise_product():
     image_urls = request.json.get("image_urls")
     description = request.json.get("description")
     price = request.json.get("price")
+    amount = request.json.get("amount")
 
     # find item
     if item_id is None or (not ObjectId.is_valid(item_id)):
@@ -315,6 +312,8 @@ def revise_product():
         updated_item["description"] = description
     if price:
         updated_item["price"] = price
+    if amount:
+        updated_item["amount"] = amount
 
     # check user auth
     if api_key:
@@ -376,20 +375,22 @@ def remove_product():
             isOwner = False
         if userFromSession and isOwner:
             remove_from_sell_list = app.mongo.db.user.find_one_and_update(
-                filter={"_id": userFromSession["userId"], "sell_list."+ str(item_id): {"$gt":0}},
+                filter={
+                    "_id": userFromSession["userId"],
+                    "sell_list." + str(item_id): {"$gt": 0},
+                },
                 update={"$unset": {"sell_list." + str(item_id): 1}},
             )
             remove_item = app.mongo.db.product.remove({"_id": item_id})
-
-            # remove_item = app.mongo.db.user.update({'_id': userFromSession['userId']}, {
-            #                                        "$pull": {"sell_list": item_id}})
             if remove_from_sell_list and remove_item:
                 response["response"] = "Remove product complete"
             else:
                 status_code = 400
                 response["response"] = "Something went wrong"
         else:
-            response["response"] = "User has no authentication, you are "+ str(userFromSession["userId"])
+            response["response"] = "User has no authentication, you are " + str(
+                userFromSession["userId"]
+            )
     else:
         status_code = 400
         response["response"] = "Authorization error"
@@ -429,6 +430,7 @@ def get_user_info():
     checkUser = app.mongo.db.user.find_one({"_id": ObjectId(userId)})
     if checkUser:
         response["email"] = checkUser["email"]
+        response["wallet_address"] = checkUser["wallet_address"]
         response["cart_list"] = checkUser["cart_list"]
         response["sell_list"] = checkUser["sell_list"]
         response["buy_list"] = checkUser["buy_list"]
@@ -454,9 +456,71 @@ def get_item_info():
         response["image_urls"] = checkProduct["image_urls"]
         response["description"] = checkProduct["description"]
         response["price"] = checkProduct["price"]
+        response["amount"] = checkProduct["amount"]
         response["owner"] = checkProduct["owner"]
         response["response"] = "successful"
         return make_response(json.dumps(response, default=json_util.default), 200)
 
     response["response"] = "Product ID is not found"
     return make_response(json.dumps(response), 400)
+
+
+## TODO 寫成endpoint或function應該都行
+# @app.route("/newWallet", methods=["GET"])
+# def new_wallet():
+#     return address
+
+
+@app.route("/confirmOrder", methods=["GET"])
+def confirm_order():
+    response = {"response": ""}
+
+    api_key = request.headers.get("Authorization")
+
+    if api_key:
+        api_key = api_key.replace("Basic ", "", 1)
+        try:
+            api_key = base64.b64decode(api_key).decode("utf-8")
+        except TypeError:
+            pass
+        userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
+        if userFromSession:
+            user = app.mongo.db.user.find_one({"_id": userFromSession["userId"]})
+            if user["cart_list"] != {}:
+                # transform from cart_list to buy_list
+                amount = user["cart_list"][itemId]
+                for itemId in user["cart_list"]:
+                    checkProduct = app.mongo.db.product.find_one(
+                        {"_id": ObjectId(itemId)}
+                    )
+
+                    if checkProduct["owner"] in buy_list:
+                        buy_list[checkProduct["owner"]][itemId] = amount
+                        buy_list[checkProduct["owner"]]["total"] += (
+                            checkProduct["price"] * amount
+                        )
+                    else:
+                        buy_list[checkProduct["owner"]] = {}
+                        buy_list[checkProduct["owner"]][itemId] = amount
+                        buy_list[checkProduct["owner"]]["total"] = (
+                            checkProduct["price"] * amount
+                        )
+                # clean cart_list
+                clean_cart = app.mongo.db.product.find_one_and_update(
+                    filter={"_id": ObjectId(itemId)},
+                    update={"$unset": {"cart_list": {}}},
+                )
+            else:
+                response["response"] = "Cart is empty"
+                return make_response(json.dumps(response), 400)
+        else:
+            response["response"] = "User has not logged in"
+            return make_response(json.dumps(response), 400)
+            
+    else
+        response["response"] = "Authorization error"
+        return make_response(json.dumps(response), 400)
+
+    ## TODO 將user['buy_list']存進block
+
+    return make_response(json.dumps(response), 200)

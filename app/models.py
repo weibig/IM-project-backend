@@ -10,6 +10,7 @@ class User:
         self.username = None
         self.email = None
         self.password_hash = None
+        self.wallet_address = None
         self.cart_list = {}
         self.buy_list = {}
         self.sell_list = {}
@@ -67,12 +68,13 @@ class User:
 
 
 class Product:
-    def __init__(self, id, name, image_urls, description, price):
+    def __init__(self, id, name, image_urls, description, price, amount):
         self.id = id
         self.name = name
         self.image_urls = image_urls
         self.description = description
         self.price = price
+        self.amount = amount
         self.owner = None
 
     @staticmethod
@@ -82,6 +84,7 @@ class Product:
         productObj.image_urls = product["image_urls"]
         productObj.description = product["description"]
         productObj.price = product["price"]
+        productObj.amount = product["amount"]
         productObj.owner = product["owner"]
         return productObj
 
@@ -95,6 +98,7 @@ class Product:
                 "image_urls": self.image_urls,
                 "description": self.description,
                 "price": self.price,
+                "amount": self.amount,
                 "owner": self.owner,  # userId
             }
         )
