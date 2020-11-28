@@ -464,9 +464,7 @@ def get_item_info():
     response["response"] = "Product ID is not found"
     return make_response(json.dumps(response), 400)
 
-
 ## TODO 寫成endpoint或function應該都行
-# @app.route("/newWallet", methods=["GET"])
 # def new_wallet():
 #     return address
 
@@ -510,6 +508,12 @@ def confirm_order():
                     filter={"_id": ObjectId(itemId)},
                     update={"$unset": {"cart_list": {}}},
                 )
+                transaction_address = new_order()
+                updateTransaction = app.mongo.db.user.find_one_and_update(
+                    filter={"_id": userFromSession["userId"]},
+                    update={"$set": {"transaction_list." + str(transaction_address): "pending"}},
+                    upsert=True
+                )
             else:
                 response["response"] = "Cart is empty"
                 return make_response(json.dumps(response), 400)
@@ -517,10 +521,42 @@ def confirm_order():
             response["response"] = "User has not logged in"
             return make_response(json.dumps(response), 400)
             
-    else
+    else:
         response["response"] = "Authorization error"
         return make_response(json.dumps(response), 400)
 
-    ## TODO 將user['buy_list']存進block
-
     return make_response(json.dumps(response), 200)
+
+## TODO 將user['buy_list']存進block 回傳transaction's address
+# def new_order():
+#     return address
+
+@app.route("/confirmReceive", methods=["POST"])
+def confirm_receive():
+    response = {"response": ""}
+    transaction_address = request.json.get("transaction_address")
+    api_key = request.headers.get("Authorization")
+
+    if api_key:
+        api_key = api_key.replace("Basic ", "", 1)
+        try:
+            api_key = base64.b64decode(api_key).decode("utf-8")
+        except TypeError:
+            pass
+        userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
+        if userFromSession:
+            updateTransaction = app.mongo.db.user.find_one_and_update(
+                filter={"_id": userFromSession["userId"]},
+                update={"$set": {"transaction_list." + str(transaction_address): "received"}}
+            )
+            ## TODO 將buyer事先付的錢轉給seller
+        else:
+            response["response"] = "User has not logged in"
+            return make_response(json.dumps(response), 400)
+            
+    else:
+        response["response"] = "Authorization error"
+        return make_response(json.dumps(response), 400)
+    
+    return make_response(json.dumps(response,200))
+

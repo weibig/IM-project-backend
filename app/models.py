@@ -11,9 +11,10 @@ class User:
         self.email = None
         self.password_hash = None
         self.wallet_address = None
-        self.cart_list = {}
-        self.buy_list = {}
-        self.sell_list = {}
+        self.transaction_list = {} # {tid: status}
+        self.cart_list = {} # {pid: amount}
+        self.buy_list = {} # {seller: {pid:amount,total:price}}
+        self.sell_list = {} # {pid: amount}
 
     def is_authenticated(self):
         return True
