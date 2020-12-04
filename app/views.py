@@ -7,7 +7,12 @@ import json
 import base64
 import uuid
 import logging
-
+from web3 import Web3
+import time
+from eth_wallet.infura import Infura
+from eth_account import Account
+from eth_keys import keys
+from mnemonic import Mnemonic
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -119,7 +124,7 @@ def register():
     user = User("")
     user.username = username
     user.hash_password(password=password)
-    user.wallet_address = new_wallet()  # TODO
+    user.wallet_address, user.priv_key = new_wallet()
     user.set_email(email=email)
 
     if user.save():
@@ -464,9 +469,21 @@ def get_item_info():
     response["response"] = "Product ID is not found"
     return make_response(json.dumps(response), 400)
 
-## TODO 寫成endpoint或function應該都行
-# def new_wallet():
-#     return address
+def new_wallet():
+
+    mnemonic = Mnemonic("english")
+    mnemonic_sentence = mnemonic.generate()
+
+    seed = mnemonic.to_seed(mnemonic_sentence)
+    master_private_key = seed[32:]
+
+    account = Account.privateKeyToAccount(master_private_key)
+
+    priv_key = keys.PrivateKey(master_private_key)
+    pub_key = priv_key.public_key
+
+    w3 = Infura().get_web3()
+    return account.address, priv_key
 
 
 @app.route("/confirmOrder", methods=["GET"])
@@ -508,7 +525,7 @@ def confirm_order():
                     filter={"_id": ObjectId(itemId)},
                     update={"$unset": {"cart_list": {}}},
                 )
-                transaction_address = new_order()
+                transaction_address = new_order(buy_list, user_address, user_priv_key, total_amount) #todo 需要 user 的 address & private key & total amount
                 updateTransaction = app.mongo.db.user.find_one_and_update(
                     filter={"_id": userFromSession["userId"]},
                     update={"$set": {"transaction_list." + str(transaction_address): "pending"}},
@@ -527,9 +544,29 @@ def confirm_order():
 
     return make_response(json.dumps(response), 200)
 
-## TODO 將user['buy_list']存進block 回傳transaction's address
-# def new_order():
-#     return address
+# 將user['buy_list']存進block 回傳transaction's address, 同時由買家錢包轉錢至平台錢包
+def new_order(buy_list, user_address, user_priv_key, total_amount):
+    w3 = Infura().get_web3()
+    amount_in_ether = total_amount
+    amount_in_wei = w3.toWei(amount_in_ether,'ether')
+
+    acct = w3.eth.account.privateKeyToAccount(user_priv_key)
+
+    txn_dict = {
+            'to': '0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889', # 平台錢包的 address
+            'value': amount_in_wei,
+            'gas': 4465030,
+            'gasPrice': w3.toWei('21', 'gwei'),
+            'from': user_address,
+            'nonce': w3.eth.getTransactionCount(user_address),
+            'data': buy_list.encode('utf-8')
+    }
+    
+    signed_txn = acct.signTransaction(txn_dict)
+    txn_hash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
+    txReceipt = w3.eth.waitForTransactionReceipt(txn_hash)
+
+    return txReceipt['transactionHash'].hex()
 
 @app.route("/confirmReceive", methods=["POST"])
 def confirm_receive():
@@ -549,7 +586,7 @@ def confirm_receive():
                 filter={"_id": userFromSession["userId"]},
                 update={"$set": {"transaction_list." + str(transaction_address): "received"}}
             )
-            ## TODO 將buyer事先付的錢轉給seller
+            pay_seller(seller_address, total_amount) # todo 需要 user address & total amount (需要從之前的交易爬total amount?)
         else:
             response["response"] = "User has not logged in"
             return make_response(json.dumps(response), 400)
@@ -560,3 +597,24 @@ def confirm_receive():
     
     return make_response(json.dumps(response,200))
 
+# 由平台錢包轉錢至賣家錢包
+def pay_seller(seller_address, total_amount):
+    w3 = Infura().get_web3()
+    amount_in_ether = total_amount
+    amount_in_wei = w3.toWei(amount_in_ether,'ether')
+
+    acct = w3.eth.account.privateKeyToAccount('0x999028f9956d8aab71015b3a0648b3f0a512ce417d91d1e993518e4d23408eda') # 平台錢包的 private key
+
+    txn_dict = {
+            'to': user_address, 
+            'value': amount_in_wei,
+            'gas': 4465030,
+            'gasPrice': w3.toWei('21', 'gwei'),
+            'from': '0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889', # 平台錢包的 address
+            'nonce': w3.eth.getTransactionCount('0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889'), # 平台錢包的 address
+            'data': buy_list.encode('utf-8')
+    }
+    
+    signed_txn = acct.signTransaction(txn_dict)
+    txn_hash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
+    txReceipt = w3.eth.waitForTransactionReceipt(txn_hash)

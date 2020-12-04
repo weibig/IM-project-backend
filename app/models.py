@@ -2,6 +2,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from app import app
 from datetime import datetime
 from bson import json_util
+from web3 import Web3, HTTPProvider
+from eth_wallet.exceptions import InfuraErrorException
 
 
 class User:
@@ -107,3 +109,14 @@ class Product:
             return True
         else:
             return False
+
+class Infura:
+
+    def __init__(self):
+        self.w3 = Web3(HTTPProvider("https://ropsten.infura.io/v3/57caa86e6f454063b13d717be8cc3408"))
+        pass
+
+    def get_web3(self):
+        if not self.w3.isConnected():
+            raise InfuraErrorException()
+        return self.w3
