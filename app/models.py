@@ -13,9 +13,10 @@ class User:
         self.email = None
         self.password_hash = None
         self.wallet_address = None
+        self.priv_key = None
         self.transaction_list = {} # {tid: status}
         self.cart_list = {} # {pid: amount}
-        self.buy_list = {} # {seller: {pid:amount,total:price}}
+        # self.buy_list = {} # {seller: {pid:amount,total:price}}
         self.sell_list = {} # {pid: amount}
 
     def is_authenticated(self):
@@ -47,7 +48,7 @@ class User:
         userObj.email = user["email"]
         userObj.password_hash = user["password_hash"]
         userObj.cart_list = user["cart_list"]
-        userObj.buy_list = user["buy_list"]
+        # userObj.buy_list = user["buy_list"]
         userObj.sell_list = user["sell_list"]
 
         return userObj
@@ -60,7 +61,7 @@ class User:
                 "email": self.email,
                 "createtedAt": datetime.now(),
                 "cart_list": self.cart_list,
-                "buy_list": self.buy_list,
+                # "buy_list": self.buy_list,
                 "sell_list": self.sell_list,
             }
         )

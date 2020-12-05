@@ -438,7 +438,7 @@ def get_user_info():
         response["wallet_address"] = checkUser["wallet_address"]
         response["cart_list"] = checkUser["cart_list"]
         response["sell_list"] = checkUser["sell_list"]
-        response["buy_list"] = checkUser["buy_list"]
+        # response["buy_list"] = checkUser["buy_list"]
         response["response"] = "successful"
         return make_response(json.dumps(response, default=json_util.default), 200)
 
@@ -470,7 +470,6 @@ def get_item_info():
     return make_response(json.dumps(response), 400)
 
 def new_wallet():
-
     mnemonic = Mnemonic("english")
     mnemonic_sentence = mnemonic.generate()
 
@@ -503,8 +502,8 @@ def confirm_order():
             user = app.mongo.db.user.find_one({"_id": userFromSession["userId"]})
             if user["cart_list"] != {}:
                 # transform from cart_list to buy_list
-                amount = user["cart_list"][itemId]
                 for itemId in user["cart_list"]:
+                    amount = user["cart_list"][itemId]
                     checkProduct = app.mongo.db.product.find_one(
                         {"_id": ObjectId(itemId)}
                     )
@@ -525,12 +524,14 @@ def confirm_order():
                     filter={"_id": ObjectId(itemId)},
                     update={"$unset": {"cart_list": {}}},
                 )
-                transaction_address = new_order(buy_list, user_address, user_priv_key, total_amount) #todo 需要 user 的 address & private key & total amount
-                updateTransaction = app.mongo.db.user.find_one_and_update(
-                    filter={"_id": userFromSession["userId"]},
-                    update={"$set": {"transaction_list." + str(transaction_address): "pending"}},
-                    upsert=True
-                )
+                for seller_id in buy_list.keys():
+                    seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
+                    transaction_address = new_order(buy_list[seller_id], seller['wallet_address'], seller['priv_key']) #todo 需要 user 的 address & private key & total amount(在buy_list裡面)
+                    updateTransaction = app.mongo.db.user.find_one_and_update(
+                        filter={"_id": userFromSession["userId"]},
+                        update={"$set": {"transaction_list." + str(transaction_address): "pending"}},
+                        upsert=True
+                    )
             else:
                 response["response"] = "Cart is empty"
                 return make_response(json.dumps(response), 400)
@@ -545,9 +546,9 @@ def confirm_order():
     return make_response(json.dumps(response), 200)
 
 # 將user['buy_list']存進block 回傳transaction's address, 同時由買家錢包轉錢至平台錢包
-def new_order(buy_list, user_address, user_priv_key, total_amount):
+def new_order(buy_list, user_address, user_priv_key):
     w3 = Infura().get_web3()
-    amount_in_ether = total_amount
+    amount_in_ether = buy_list['total']
     amount_in_wei = w3.toWei(amount_in_ether,'ether')
 
     acct = w3.eth.account.privateKeyToAccount(user_priv_key)
@@ -586,7 +587,9 @@ def confirm_receive():
                 filter={"_id": userFromSession["userId"]},
                 update={"$set": {"transaction_list." + str(transaction_address): "received"}}
             )
-            pay_seller(seller_address, total_amount) # todo 需要 user address & total amount (需要從之前的交易爬total amount?)
+            seller_id, data, total_amount = get_transaction_info(transaction_address) ## TODO 從區塊鏈拿transaction內容
+            seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
+            pay_seller(seller['wallet_address'], total_amount) # todo 需要 user address & total amount (需要從之前的交易爬total amount?)
         else:
             response["response"] = "User has not logged in"
             return make_response(json.dumps(response), 400)
@@ -596,6 +599,11 @@ def confirm_receive():
         return make_response(json.dumps(response), 400)
     
     return make_response(json.dumps(response,200))
+
+### TODO 
+def get_transaction_info(transaction_address):
+    return seller_id, data, total_amount
+
 
 # 由平台錢包轉錢至賣家錢包
 def pay_seller(seller_address, total_amount):

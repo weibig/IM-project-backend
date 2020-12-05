@@ -9,7 +9,14 @@ lm = LoginManager()
 lm.init_app(app)
 app.secret_key = "password"  # os.getenv("MONGO_INITDB_ROOT_PASSWORD")
 
-app.config["MONGO_URI"] = "mongodb://127.0.0.1:27017/test"
+
+# CONNECTION_STRING = "mongodb+srv://test:test@flask-mongodb-atlas-1g8po.mongodb.net/test?retryWrites=true&w=majority"
+# client = pymongo.MongoClient(CONNECTION_STRING)
+# db = client.get_database('flask_mongodb_atlas')
+# user_collection = pymongo.collection.Collection(db, 'user_collection'
+
+
+app.config["MONGO_URI"] = "mongodb+srv://weibig:wendy0223@cluster0.biwes.mongodb.net/test?retryWrites=true&w=majority"
 app.mongo = PyMongo(app)
 app.APP_URL = "http://127.0.0.1:5000"
 
