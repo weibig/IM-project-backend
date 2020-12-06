@@ -1,7 +1,7 @@
 from app import app, lm
 from flask import request, session, make_response
 from flask_login import login_user, logout_user, login_required
-from .models import User, Product
+from .models import User, Product, Infura
 from bson import json_util, ObjectId
 import json
 import base64
@@ -9,7 +9,6 @@ import uuid
 import logging
 from web3 import Web3
 import time
-from eth_wallet.infura import Infura
 from eth_account import Account
 from eth_keys import keys
 from mnemonic import Mnemonic
