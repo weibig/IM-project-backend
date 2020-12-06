@@ -525,6 +525,23 @@ def confirm_order():
                     update={"$unset": {"cart_list": {}}},
                 )
                 for seller_id in buy_list.keys():
+                    # update seller's inventory
+                    error_product = []
+                    for product_id in buy_list[seller_id].keys():
+                        updateInventory = app.mongo.db.user.find_one_and_update(
+                            filter={
+                                "_id": ObjectId(seller_id),
+                                "sell_list." + str(product_id): {"$gt": buy_list[seller_id][product_id]}
+                            },
+                            update={"$inc": {"sell_list." + str(product_id): -int(buy_list[seller_id][product_id])}},
+                        )
+                        if not updateInventory:
+                            error_product.append(product_id)
+                    if len(error_product) != 0:
+                        error_product_str = " ".join(error_product)
+                        response["response"] = "Buying "+ seller_id + "'s " + error_product_str +" failed, other products succeed"  
+                        return make_response(json.dumps(response), 400)
+
                     seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
                     transaction_address = new_order(buy_list[seller_id], seller['wallet_address'], seller['priv_key']) #todo 需要 user 的 address & private key & total amount(在buy_list裡面)
                     updateTransaction = app.mongo.db.user.find_one_and_update(
