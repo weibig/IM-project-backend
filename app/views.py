@@ -548,7 +548,7 @@ def confirm_order():
                     
                     # save successful transaction to blockchain
                     seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
-                    transaction_address = new_order(seller_id, success_data, seller['wallet_address'], seller['priv_key'])
+                    transaction_address = new_order(user.id, seller_id, success_data, seller['wallet_address'], seller['priv_key'])
                     updateTransaction = app.mongo.db.user.find_one_and_update(
                         filter={"_id": userFromSession["userId"]},
                         update={"$set": {"transaction_list." + str(transaction_address): "pending"}},
@@ -568,7 +568,7 @@ def confirm_order():
     return make_response(json.dumps(response), 200)
 
 # 將user['buy_list']存進block 回傳transaction's address, 同時由買家錢包轉錢至平台錢包
-def new_order(seller_id, seller_buy_list, user_address, user_priv_key):
+def new_order(buyer_id, seller_id, seller_buy_list, user_address, user_priv_key):
     w3 = Infura().get_web3()
     amount_in_ether = seller_buy_list['total']
     amount_in_wei = w3.toWei(amount_in_ether,'ether')
@@ -576,7 +576,9 @@ def new_order(seller_id, seller_buy_list, user_address, user_priv_key):
     acct = w3.eth.account.privateKeyToAccount(user_priv_key)
 
     input_data = {}
-    input_data['seller_id'] = seller_buy_list
+    input_data['data'] = seller_buy_list
+    input_data['buyer'] = buyer_id
+    input_data['seller'] = seller_id
 
     txn_dict = {
             'to': '0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889', # 平台錢包的 address
@@ -612,9 +614,9 @@ def confirm_receive():
                 filter={"_id": userFromSession["userId"]},
                 update={"$set": {"transaction_list." + str(transaction_address): "received"}}
             )
-            seller_id, data, total_amount = get_transaction_info(transaction_address) ## TODO 從區塊鏈拿transaction內容
+            buyer_id, seller_id, data, total_amount = get_transaction_info(transaction_address) # TODO 從區塊鏈拿transaction內容
             seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
-            pay_seller(seller['wallet_address'], total_amount) # todo 需要 total amount (需要從之前的交易爬total amount)
+            pay_seller(seller['wallet_address'], total_amount) # TODO 需要 total amount (需要從之前的交易爬total amount)
         else:
             response["response"] = "User has not logged in"
             return make_response(json.dumps(response), 400)
@@ -631,10 +633,12 @@ def get_transaction_info(transaction_address):
     input_data = w3.eth.getTransaction(transaction_address)['input']
     input_data_decode = codecs.decode(input_data[2:], 'hex')
     json_data = json.loads(input_data_decode.decode('utf-8'))
-    seller_id = json_data.keys()
-    data = json_data[seller_id]
-    total_amount = json_data[seller_id]["total"]
-    return seller_id, data, total_amount
+
+    seller_id = json_data['seller']
+    buyer_id = json_data['buyer']
+    data = json_data['data']
+    total_amount = json_data['data']['total']
+    return buyer_id, seller_id, data, total_amount
 
 # 由平台錢包轉錢至賣家錢包
 def pay_seller(seller_address, total_amount):
