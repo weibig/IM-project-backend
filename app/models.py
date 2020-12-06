@@ -3,7 +3,7 @@ from app import app
 from datetime import datetime
 from bson import json_util
 from web3 import Web3, HTTPProvider
-from eth_wallet.exceptions import InfuraErrorException
+# from eth_wallet.exceptions import InfuraErrorException   ## TODO
 
 
 class User:
@@ -14,7 +14,8 @@ class User:
         self.password_hash = None
         self.wallet_address = None
         self.priv_key = None
-        self.transaction_list = {} # {tid: status}
+        self.buy_transaction = {} # {tid: status}
+        self.sell_transaction = {} # {tid: status}
         self.cart_list = {} # {pid: amount}
         # self.buy_list = {} # {seller: {pid:amount,total:price}}
         self.sell_list = {} # {pid: amount}
@@ -47,6 +48,10 @@ class User:
         userObj.username = user["username"]
         userObj.email = user["email"]
         userObj.password_hash = user["password_hash"]
+        userObj.wallet_address = user["wallet_address"]
+        userObj.priv_key = user["priv_key"]
+        userObj.buy_transaction = user["buy_transaction"]
+        userObj.sell_transaction = user["sell_transaction"]
         userObj.cart_list = user["cart_list"]
         # userObj.buy_list = user["buy_list"]
         userObj.sell_list = user["sell_list"]
@@ -60,6 +65,10 @@ class User:
                 "password_hash": self.password_hash,
                 "email": self.email,
                 "createtedAt": datetime.now(),
+                "wallet_address": self.wallet_address,
+                "priv_key": self.priv_key,
+                "buy_transaction": self.buy_transaction,
+                "sell_transaction": self.sell_transaction,
                 "cart_list": self.cart_list,
                 # "buy_list": self.buy_list,
                 "sell_list": self.sell_list,
@@ -118,6 +127,6 @@ class Infura:
         pass
 
     def get_web3(self):
-        if not self.w3.isConnected():
-            raise InfuraErrorException()
+        # if not self.w3.isConnected():
+        #     raise InfuraErrorException()   ## TODO
         return self.w3

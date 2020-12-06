@@ -435,11 +435,7 @@ def get_user_info():
 
     checkUser = app.mongo.db.user.find_one({"_id": ObjectId(userId)})
     if checkUser:
-        response["email"] = checkUser["email"]
-        response["wallet_address"] = checkUser["wallet_address"]
-        response["cart_list"] = checkUser["cart_list"]
-        response["sell_list"] = checkUser["sell_list"]
-        # response["buy_list"] = checkUser["buy_list"]
+        response = checkUser
         response["response"] = "successful"
         return make_response(json.dumps(response, default=json_util.default), 200)
 
@@ -541,19 +537,29 @@ def confirm_order():
                             error_product.append(product_id)
                             success_data.pop(product_id)
 
+                    # save successful transaction to blockchain
+                    seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
+                    transaction_address = new_order(str(userFromSession["userId"]), seller_id, success_data, seller['wallet_address'], seller['priv_key'])
+            
+                    # store transaction address to seller's and buyer's list
+                    updateBuyTransaction = app.mongo.db.user.find_one_and_update(
+                        filter={"_id": userFromSession["userId"]},
+                        update={"$set": {"buy_transaction." + str(transaction_address): "pending"}},
+                        upsert=True
+                    )
+                    updateSellTransaction = app.mongo.db.user.find_one_and_update(
+                        filter={"_id": ObjectId(seller_id)},
+                        update={"$set": {"sell_transaction." + str(transaction_address): "pending"}},
+                        upsert=True
+                    )
+
+
                     if len(error_product) != 0:
                         error_product_str = " ".join(error_product)
                         response["response"] = "Buying "+ seller_id + "'s " + error_product_str +" failed, other products succeed"  
                         return make_response(json.dumps(response), 400)
                     
-                    # save successful transaction to blockchain
-                    seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
-                    transaction_address = new_order(user.id, seller_id, success_data, seller['wallet_address'], seller['priv_key'])
-                    updateTransaction = app.mongo.db.user.find_one_and_update(
-                        filter={"_id": userFromSession["userId"]},
-                        update={"$set": {"transaction_list." + str(transaction_address): "pending"}},
-                        upsert=True
-                    )
+                    
             else:
                 response["response"] = "Cart is empty"
                 return make_response(json.dumps(response), 400)
@@ -610,13 +616,28 @@ def confirm_receive():
             pass
         userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
         if userFromSession:
-            updateTransaction = app.mongo.db.user.find_one_and_update(
+            # buyer receive product
+            updateBuyTransaction = app.mongo.db.user.find_one_and_update(
                 filter={"_id": userFromSession["userId"]},
-                update={"$set": {"transaction_list." + str(transaction_address): "received"}}
+                update={"$set": {"buy_transaction." + str(transaction_address): "received"}}
             )
-            buyer_id, seller_id, data, total_amount = get_transaction_info(transaction_address) # TODO 從區塊鏈拿transaction內容
+            if not updateBuyTransaction:
+                response["response"] = "User has no authentication"
+                return make_response(json.dumps(response), 400)
+
+            buyer_id, seller_id, data, total_amount = get_transaction_info(transaction_address)
             seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
-            pay_seller(seller['wallet_address'], total_amount) # TODO 需要 total amount (需要從之前的交易爬total amount)
+            paidMoney = pay_seller(seller['wallet_address'], total_amount)
+            
+            if not paidMoney:
+                response["response"] = "Faid to pay seller"
+                return make_response(json.dumps(response), 400)
+            
+            # seller receive money
+            updateSellTransaction = app.mongo.db.user.find_one_and_update(
+                filter={"_id": userFromSession["userId"]},
+                update={"$set": {"buy_transaction." + str(transaction_address): "received"}}
+            )
         else:
             response["response"] = "User has not logged in"
             return make_response(json.dumps(response), 400)
@@ -627,7 +648,6 @@ def confirm_receive():
     
     return make_response(json.dumps(response,200))
 
-### TODO 
 def get_transaction_info(transaction_address):
     w3 = Infura().get_web3()
     input_data = w3.eth.getTransaction(transaction_address)['input']
@@ -641,6 +661,7 @@ def get_transaction_info(transaction_address):
     return buyer_id, seller_id, data, total_amount
 
 # 由平台錢包轉錢至賣家錢包
+### TODO 成功return True, 失敗return False
 def pay_seller(seller_address, total_amount):
     w3 = Infura().get_web3()
     amount_in_ether = total_amount
