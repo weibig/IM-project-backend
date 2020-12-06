@@ -528,6 +528,7 @@ def confirm_order():
                 for seller_id in buy_list.keys():
                     # update seller's inventory
                     error_product = []
+                    success_data = buy_list[seller_id]
                     for product_id in buy_list[seller_id].keys():
                         updateInventory = app.mongo.db.user.find_one_and_update(
                             filter={
@@ -538,13 +539,16 @@ def confirm_order():
                         )
                         if not updateInventory:
                             error_product.append(product_id)
+                            success_data.pop(product_id)
+
                     if len(error_product) != 0:
                         error_product_str = " ".join(error_product)
                         response["response"] = "Buying "+ seller_id + "'s " + error_product_str +" failed, other products succeed"  
                         return make_response(json.dumps(response), 400)
-
+                    
+                    # save successful transaction to blockchain
                     seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
-                    transaction_address = new_order(seller_id, buy_list[seller_id], seller['wallet_address'], seller['priv_key'])
+                    transaction_address = new_order(seller_id, success_data, seller['wallet_address'], seller['priv_key'])
                     updateTransaction = app.mongo.db.user.find_one_and_update(
                         filter={"_id": userFromSession["userId"]},
                         update={"$set": {"transaction_list." + str(transaction_address): "pending"}},
