@@ -478,7 +478,7 @@ def new_wallet():
     pub_key = priv_key.public_key
 
     w3 = Infura().get_web3()
-    return account.address, priv_key
+    return account.address, str(priv_key)
 
 
 @app.route("/confirmOrder", methods=["GET"])
