@@ -16,7 +16,7 @@ app.secret_key = "password"  # os.getenv("MONGO_INITDB_ROOT_PASSWORD")
 # user_collection = pymongo.collection.Collection(db, 'user_collection'
 
 
-app.config["MONGO_URI"] = "mongodb+srv://weibig:wendy0223@cluster0.biwes.mongodb.net/test?retryWrites=true&w=majority"
+app.config["MONGO_URI"] = "mongodb+srv://weibig:wendy0223@cluster0.dx9k9.mongodb.net/test?retryWrites=true&w=majority"
 app.mongo = PyMongo(app)
 app.APP_URL = "http://127.0.0.1:5000"
 
