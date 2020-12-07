@@ -228,6 +228,7 @@ def add_product():
     image_urls = request.json.get("image_urls")
     description = request.json.get("description")
     price = request.json.get("price")
+    amount = request.json.get("amount")
 
     if not image_urls:
         image_urls = []
@@ -261,7 +262,7 @@ def add_product():
 
                 add_item = app.mongo.db.user.find_one_and_update(
                     filter={"_id": userFromSession["userId"]},
-                    update={"$inc": {"sell_list." + str(product.id): 1}},
+                    update={"$inc": {"sell_list." + str(product.id): amount}},
                     upsert=True,
                 )
 
@@ -498,6 +499,7 @@ def confirm_order():
             user = app.mongo.db.user.find_one({"_id": userFromSession["userId"]})
             if user["cart_list"] != {}:
                 # transform from cart_list to buy_list
+                buy_list = {}
                 for itemId in user["cart_list"]:
                     amount = user["cart_list"][itemId]
                     checkProduct = app.mongo.db.product.find_one(
@@ -523,7 +525,7 @@ def confirm_order():
                 for seller_id in buy_list.keys():
                     # update seller's inventory
                     error_product = []
-                    success_data = buy_list[seller_id]
+                    success_data = buy_list[seller_id].copy()
                     for product_id in buy_list[seller_id].keys():
                         updateInventory = app.mongo.db.user.find_one_and_update(
                             filter={
@@ -532,7 +534,7 @@ def confirm_order():
                             },
                             update={"$inc": {"sell_list." + str(product_id): -int(buy_list[seller_id][product_id])}},
                         )
-                        if not updateInventory:
+                        if not updateInventory and product_id != "total":
                             error_product.append(product_id)
                             success_data.pop(product_id)
 
