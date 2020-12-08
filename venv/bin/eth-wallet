@@ -1,0 +1,12 @@
+#!/Users/katherine/Desktop/eth-wallet/venv/bin/python3
+# EASY-INSTALL-ENTRY-SCRIPT: 'eth-wallet==1.1.3.dev0+gcc746de.d20201128','console_scripts','eth-wallet'
+__requires__ = 'eth-wallet==1.1.3.dev0+gcc746de.d20201128'
+import re
+import sys
+from pkg_resources import load_entry_point
+
+if __name__ == '__main__':
+    sys.argv[0] = re.sub(r'(-script\.pyw?|\.exe)?$', '', sys.argv[0])
+    sys.exit(
+        load_entry_point('eth-wallet==1.1.3.dev0+gcc746de.d20201128', 'console_scripts', 'eth-wallet')()
+    )

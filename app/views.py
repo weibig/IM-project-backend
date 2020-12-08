@@ -548,7 +548,7 @@ def confirm_order():
                     )
                     updateSellTransaction = app.mongo.db.user.find_one_and_update(
                         filter={"_id": ObjectId(seller_id)},
-                        update={"$set": {"sell_transaction." + str(transaction_address): "pending"}},
+          usapplicat              update={"$set": {"sell_transaction." + str(transaction_address): "pending"}},
                         upsert=True
                     )
 
