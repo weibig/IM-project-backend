@@ -587,9 +587,9 @@ def new_order(buyer_id, seller_id, seller_buy_list, user_address, user_priv_key)
 
     input_data = {}
     input_data['data'] = seller_buy_list
-    input_data['buyer'] = buyer_id
-    input_data['seller'] = seller_id
-    input_data = json.dumps(input_data, default=json_util.default)
+    input_data['buyer'] = str(buyer_id)
+    input_data['seller'] = str(seller_id)
+    input_data = json.dumps(input_data)
 
     txn_dict = {
             'to': '0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889', # 平台錢包的 address
@@ -635,7 +635,10 @@ def confirm_receive():
                 return make_response(json.dumps(response), 400)
 
             buyer_id, seller_id, data, total_amount = get_transaction_info(transaction_address)
-            seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
+            seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id["$oid"])})
+            if not seller:
+                response["response"] = "Owner not found"+str(seller_id)
+                return make_response(json.dumps(response), 400)
             paidMoney = pay_seller(seller['wallet_address'], total_amount)
             
             if not paidMoney:
@@ -673,19 +676,18 @@ def get_transaction_info(transaction_address):
 ### TODO 成功return True, 失敗return False
 def pay_seller(seller_address, total_amount):
     w3 = Infura().get_web3()
-    amount_in_ether = total_amount
+    amount_in_ether = total_amount/10000
     amount_in_wei = w3.toWei(amount_in_ether,'ether')
 
     acct = w3.eth.account.privateKeyToAccount('0x999028f9956d8aab71015b3a0648b3f0a512ce417d91d1e993518e4d23408eda') # 平台錢包的 private key
 
     txn_dict = {
-            'to': user_address, 
+            'to': seller_address, 
             'value': amount_in_wei,
             'gas': 4465030,
             'gasPrice': w3.toWei('21', 'gwei'),
             'from': '0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889', # 平台錢包的 address
-            'nonce': w3.eth.getTransactionCount('0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889'), # 平台錢包的 address
-            'data': buy_list.encode('utf-8')
+            'nonce': w3.eth.getTransactionCount('0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889') # 平台錢包的 address
     }
     
     signed_txn = acct.signTransaction(txn_dict)
