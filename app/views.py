@@ -43,7 +43,7 @@ def login():
             )
             return make_response(json_util.dumps(userSession), 200)
     else:
-        response["response"] = "Worng password"
+        response["response"] = "Wrong password"
         return make_response(json.dumps(response), 400)
 
 
@@ -437,11 +437,19 @@ def get_user_info():
     checkUser = app.mongo.db.user.find_one({"_id": ObjectId(userId)})
     if checkUser:
         response = checkUser
+        balance = get_wallet_balance(response['wallet_address'])
         response["response"] = "successful"
+        response["balance"] = balance
         return make_response(json.dumps(response, default=json_util.default), 200)
 
     response["response"] = "User ID is not found"
     return make_response(json.dumps(response), 400)
+
+## TODO
+def get_wallet_balance(wallet_address):
+    return balance
+
+
 
 
 @app.route("/itemInfo", methods=["GET"])
@@ -544,7 +552,11 @@ def confirm_order():
                     # save successful transaction to blockchain
                     seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
                     transaction_address = new_order(str(userFromSession["userId"]), seller_id, success_data, seller['wallet_address'], seller['priv_key'])
-            
+
+                    if not transaction_address:
+                        response["response"] = "Failed to pay money"
+                        return make_response(json.dumps(response), 400)
+
                     # store transaction address to seller's and buyer's list
                     updateBuyTransaction = app.mongo.db.user.find_one_and_update(
                         filter={"_id": userFromSession["userId"]},
@@ -602,6 +614,8 @@ def new_order(buyer_id, seller_id, seller_buy_list, user_address, user_priv_key)
     }
     
     signed_txn = acct.signTransaction(txn_dict)
+    ## TODO 轉錢不成功 false
+
     txn_hash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
     txReceipt = w3.eth.waitForTransactionReceipt(txn_hash)
 
@@ -642,7 +656,7 @@ def confirm_receive():
             paidMoney = pay_seller(seller['wallet_address'], total_amount)
             
             if not paidMoney:
-                response["response"] = "Faid to pay seller"
+                response["response"] = "Failed to pay seller"
                 return make_response(json.dumps(response), 400)
             
             # seller receive money
@@ -673,7 +687,7 @@ def get_transaction_info(transaction_address):
     return buyer_id, seller_id, data, total_amount
 
 # 由平台錢包轉錢至賣家錢包
-### TODO 成功return True, 失敗return False
+### TODO 轉錢失敗return False
 def pay_seller(seller_address, total_amount):
     w3 = Infura().get_web3()
     amount_in_ether = total_amount/10000
