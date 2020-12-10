@@ -612,6 +612,10 @@ def confirm_receive():
     transaction_address = request.json.get("transaction_address")
     api_key = request.headers.get("Authorization")
 
+    if transaction_address is None:
+        response["response"] = "Transaction address is not provided"
+        return make_response(json.dumps(response), 400)
+
     if api_key:
         api_key = api_key.replace("Basic ", "", 1)
         try:
