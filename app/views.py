@@ -474,6 +474,8 @@ def new_wallet():
     master_private_key = seed[32:]
 
     account = Account.privateKeyToAccount(master_private_key)
+    requests.get('https://faucet.ropsten.be/donate/'+str(account.address))
+
 
     priv_key = keys.PrivateKey(master_private_key)
     pub_key = priv_key.public_key
