@@ -487,7 +487,7 @@ def new_wallet():
 
 @app.route("/confirmOrder", methods=["GET"])
 def confirm_order():
-    response = {"response": ""}
+    response = {"response": "successful"}
 
     api_key = request.headers.get("Authorization")
 
@@ -609,7 +609,7 @@ def new_order(buyer_id, seller_id, seller_buy_list, user_address, user_priv_key)
 
 @app.route("/confirmReceive", methods=["POST"])
 def confirm_receive():
-    response = {"response": ""}
+    response = {"response": "successful"}
     transaction_address = request.json.get("transaction_address")
     api_key = request.headers.get("Authorization")
 
@@ -658,7 +658,7 @@ def confirm_receive():
         response["response"] = "Authorization error"
         return make_response(json.dumps(response), 400)
     
-    return make_response(json.dumps(response,200))
+    return make_response(json.dumps(response),200)
 
 def get_transaction_info(transaction_address):
     w3 = Infura().get_web3()
@@ -693,3 +693,5 @@ def pay_seller(seller_address, total_amount):
     signed_txn = acct.signTransaction(txn_dict)
     txn_hash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
     txReceipt = w3.eth.waitForTransactionReceipt(txn_hash)
+
+    return True
