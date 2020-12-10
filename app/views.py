@@ -580,7 +580,7 @@ def confirm_order():
 # 將user['buy_list']存進block 回傳transaction's address, 同時由買家錢包轉錢至平台錢包
 def new_order(buyer_id, seller_id, seller_buy_list, user_address, user_priv_key):
     w3 = Infura().get_web3()
-    amount_in_ether = seller_buy_list['total']
+    amount_in_ether = seller_buy_list['total']/10000
     amount_in_wei = w3.toWei(amount_in_ether,'ether')
 
     acct = w3.eth.account.privateKeyToAccount(user_priv_key)
