@@ -13,6 +13,7 @@ from eth_account import Account
 from eth_keys import keys
 from mnemonic import Mnemonic
 import codecs as codecs
+import requests
 
 @app.route("/login", methods=["POST"])
 def login():
