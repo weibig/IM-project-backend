@@ -586,7 +586,7 @@ def new_order(buyer_id, seller_id, seller_buy_list, user_address, user_priv_key)
     input_data['data'] = seller_buy_list
     input_data['buyer'] = buyer_id
     input_data['seller'] = seller_id
-    input_data = json.dumps(input_data)
+    input_data = json.dumps(input_data, default=json_util.default)
 
     txn_dict = {
             'to': '0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889', # 平台錢包的 address
