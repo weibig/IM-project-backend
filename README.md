@@ -1,9 +1,5 @@
 # IM-project-backend
 
-## Start MongoDB
-```
-mongod --dbpath ./db/data
-```
 
 ## Start the proxy
 ```
