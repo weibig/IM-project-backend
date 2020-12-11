@@ -447,7 +447,7 @@ def get_user_info():
 
 def get_wallet_balance(wallet_address):
     w3 = Infura().get_web3()
-    balance = w3.eth.getBalance('0x4663dCC00a364427576576A9375c0BeB4aff1F09')
+    balance = w3.eth.getBalance(wallet_address)
     eth_balance = w3.fromWei(balance, 'ether');
     return eth_balance
 
