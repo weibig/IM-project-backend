@@ -407,10 +407,17 @@ def remove_product():
 @app.route("/allCollector", methods=["GET"])  # collector list
 def get_all_collector():
     collectors = []
+    amounts = []
     offset = int(request.json.get("offset")) if request.json.get("offset") else 0
     length = int(request.json.get("length")) if request.json.get("length") else 0
-    for r in app.mongo.db.user.find({"sell_list.0": {"$exists": "true"}}):
+    for r in app.mongo.db.user.find({"sell_list": {"$exists": "true", "$not": {"$size": 0}}}):
+        amount = 0
+        for product in r["sell_list"]:
+            amount += r["sell_list"][product]
+        amounts.append(amount)
         collectors.append(r["_id"])
+
+    amounts, collectors = zip(*sorted(zip(amounts, collectors)))
 
     if offset > len(collectors):
         response = {"response": "invalid offset"}
