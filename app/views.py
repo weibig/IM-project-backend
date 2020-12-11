@@ -61,7 +61,7 @@ def logout():
         userFromSession = app.mongo.db.session.find_one({"session_id": api_key})
         if userFromSession:
             deleteUser = app.mongo.db.session.remove(
-                {"_id": userFromSession["uid"]}, True
+                {"_id": userFromSession["session_id"]}, True
             )
             if deleteUser:
                 status_code = 200
