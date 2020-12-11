@@ -404,7 +404,7 @@ def remove_product():
     return make_response(json.dumps(response), status_code)
 
 
-@app.route("/allCollector", methods=["GET"])  # collector list
+@app.route("/allCollector", methods=["POST"])  # collector list
 def get_all_collector():
     collectors = []
     offset = int(request.json.get("offset")) if request.json.get("offset") else 0
@@ -425,7 +425,7 @@ def get_all_collector():
     return make_response(json.dumps(response, default=json_util.default), 200)
 
 
-@app.route("/userInfo", methods=["GET"])
+@app.route("/userInfo", methods=["POST"])
 def get_user_info():
     response = {}
     userId = request.json.get("userId")
@@ -452,7 +452,7 @@ def get_wallet_balance(wallet_address):
 
 
 
-@app.route("/itemInfo", methods=["GET"])
+@app.route("/itemInfo", methods=["POST"])
 def get_item_info():
     response = {}
     itemId = request.json.get("itemId")
