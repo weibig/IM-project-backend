@@ -480,7 +480,7 @@ def get_user_info():
         response = checkUser
         balance = get_wallet_balance(response['wallet_address'])
         response["response"] = "successful"
-        response["balance"] = balance
+        response["balance"] = str(balance)
         return make_response(json.dumps(response, default=json_util.default), 200)
 
     response["response"] = "User ID is not found"
