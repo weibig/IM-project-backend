@@ -410,14 +410,15 @@ def get_all_collector():
     amounts = []
     offset = int(request.json.get("offset")) if request.json.get("offset") else 0
     length = int(request.json.get("length")) if request.json.get("length") else 0
-    for r in app.mongo.db.user.find({"sell_list": {"$exists": "true", "$not": {"$size": 0}}}):
+    for r in app.mongo.db.user.find({"sell_list": {"$exists": "true"}}):
         amount = 0
         for product in r["sell_list"]:
             amount += r["sell_list"][product]
-        amounts.append(amount)
-        collectors.append(r["_id"])
+        if amount != 0:
+            amounts.append(amount)
+            collectors.append(r["_id"])
 
-    amounts, collectors = zip(*sorted(zip(amounts, collectors)))
+    amounts, collectors = zip(*sorted(zip(amounts, collectors), reverse = True))
 
     if offset > len(collectors):
         response = {"response": "invalid offset"}
@@ -428,7 +429,7 @@ def get_all_collector():
     else:
         collectors = collectors[offset : offset + length]
 
-    response = {"collectors": collectors, "response": "successful"}
+    response = {"collectors": collectors, "amounts": amounts, "response": "successful"}
     return make_response(json.dumps(response, default=json_util.default), 200)
 
 
