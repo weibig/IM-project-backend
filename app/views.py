@@ -453,12 +453,11 @@ def get_user_info():
     response["response"] = "User ID is not found"
     return make_response(json.dumps(response), 400)
 
-## TODO
 def get_wallet_balance(wallet_address):
-    return balance
-
-
-
+    w3 = Infura().get_web3()
+    balance = w3.eth.getBalance('0x4663dCC00a364427576576A9375c0BeB4aff1F09')
+    eth_balance = w3.fromWei(balance, 'ether');
+    return eth_balance
 
 @app.route("/itemInfo", methods=["POST"])
 def get_item_info():
@@ -598,6 +597,7 @@ def confirm_order():
 
 # 將user['buy_list']存進block 回傳transaction's address, 同時由買家錢包轉錢至平台錢包
 def new_order(buyer_id, seller_id, seller_buy_list, user_address, user_priv_key):
+    response = {"response": ""}
     w3 = Infura().get_web3()
     amount_in_ether = seller_buy_list['total']/10000
     amount_in_wei = w3.toWei(amount_in_ether,'ether')
@@ -621,7 +621,11 @@ def new_order(buyer_id, seller_id, seller_buy_list, user_address, user_priv_key)
     }
     
     signed_txn = acct.signTransaction(txn_dict)
-    ## TODO 轉錢不成功 false
+    
+    ## 轉錢不成功 false
+    current_balance = get_wallet_balance(user_address)
+    if int(current_balance) < amount_in_ether:
+        return False
 
     txn_hash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
     txReceipt = w3.eth.waitForTransactionReceipt(txn_hash)
@@ -694,7 +698,7 @@ def get_transaction_info(transaction_address):
     return buyer_id, seller_id, data, total_amount
 
 # 由平台錢包轉錢至賣家錢包
-### TODO 轉錢失敗return False
+### 轉錢失敗return False
 def pay_seller(seller_address, total_amount):
     w3 = Infura().get_web3()
     amount_in_ether = total_amount/10000
@@ -711,6 +715,10 @@ def pay_seller(seller_address, total_amount):
             'nonce': w3.eth.getTransactionCount('0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889') # 平台錢包的 address
     }
     
+    current_balance = get_wallet_balance('0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889')
+    if int(current_balance) < amount_in_ether:
+        return False
+
     signed_txn = acct.signTransaction(txn_dict)
     txn_hash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
     txReceipt = w3.eth.waitForTransactionReceipt(txn_hash)
