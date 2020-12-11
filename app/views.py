@@ -143,6 +143,10 @@ def add_to_cart():
     item_id = request.json.get("item_id")
     api_key = request.headers.get("Authorization")
 
+    amount = request.json.get("amount")
+    if amount is None:
+        amount = 1
+
     if item_id is None or (not ObjectId.is_valid(item_id)):
         response["response"] = "Item ID is not provided or format wrong"
         return make_response(json.dumps(response), 400)
@@ -156,7 +160,7 @@ def add_to_cart():
         if userFromSession:
             add_item = app.mongo.db.user.find_one_and_update(
                 filter={"_id": userFromSession["userId"]},
-                update={"$inc": {"cart_list." + item_id: 1}},
+                update={"$inc": {"cart_list." + item_id: amount}},
                 upsert=True,
             )
             if add_item:
@@ -181,6 +185,10 @@ def remove_to_cart():
     item_id = request.json.get("item_id")
     api_key = request.headers.get("Authorization")
 
+    amount = request.json.get("amount")
+    if amount is None:
+        amount = 1
+
     if item_id is None or (not ObjectId.is_valid(item_id)):
         response["response"] = "Item ID is not provided or format wrong"
         return make_response(json.dumps(response), 400)
@@ -198,7 +206,7 @@ def remove_to_cart():
                     "_id": userFromSession["userId"],
                     "cart_list." + item_id: {"$gt": 0},
                 },
-                update={"$inc": {"cart_list." + item_id: -1}},
+                update={"$inc": {"cart_list." + item_id: -amount}},
             )
             if remove_item:
                 response["response"] = "Remove cart complete"
@@ -407,10 +415,18 @@ def remove_product():
 @app.route("/allCollector", methods=["POST"])  # collector list
 def get_all_collector():
     collectors = []
+    amounts = []
     offset = int(request.json.get("offset")) if request.json.get("offset") else 0
     length = int(request.json.get("length")) if request.json.get("length") else 0
-    for r in app.mongo.db.user.find({"sell_list.0": {"$exists": "true"}}):
-        collectors.append(r["_id"])
+    for r in app.mongo.db.user.find({"sell_list": {"$exists": "true"}}):
+        amount = 0
+        for product in r["sell_list"]:
+            amount += r["sell_list"][product]
+        if amount != 0:
+            amounts.append(amount)
+            collectors.append(r["_id"])
+
+    amounts, collectors = zip(*sorted(zip(amounts, collectors), reverse = True))
 
     if offset > len(collectors):
         response = {"response": "invalid offset"}
@@ -421,7 +437,32 @@ def get_all_collector():
     else:
         collectors = collectors[offset : offset + length]
 
-    response = {"collectors": collectors, "response": "successful"}
+    response = {"collectors": collectors, "amounts": amounts, "response": "successful"}
+    return make_response(json.dumps(response, default=json_util.default), 200)
+
+@app.route("/allProduct", methods=["POST"])  # product list
+def get_all_product():
+    products = []
+    amounts = []
+    offset = int(request.json.get("offset")) if request.json.get("offset") else 0
+    length = int(request.json.get("length")) if request.json.get("length") else 0
+    for r in app.mongo.db.user.find({"sell_list": {"$exists": "true"}}):
+        for product in r["sell_list"]:
+            amounts.append(r["sell_list"][product])
+            products.append(product)
+
+    amounts, products = zip(*sorted(zip(amounts, products), reverse = True))
+
+    if offset > len(products):
+        response = {"response": "invalid offset"}
+        return make_response(json.dumps(response), 400)
+
+    if offset + length > len(products) or length == 0:
+        products = products[offset:]
+    else:
+        products = products[offset : offset + length]
+
+    response = {"products": products, "amounts": amounts, "response": "successful"}
     return make_response(json.dumps(response, default=json_util.default), 200)
 
 
