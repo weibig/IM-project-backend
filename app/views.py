@@ -467,7 +467,6 @@ def get_item_info():
         response["image_urls"] = checkProduct["image_urls"]
         response["description"] = checkProduct["description"]
         response["price"] = checkProduct["price"]
-        response["amount"] = checkProduct["amount"]
         response["owner"] = checkProduct["owner"]
         response["response"] = "successful"
         return make_response(json.dumps(response, default=json_util.default), 200)
