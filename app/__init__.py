@@ -1,10 +1,11 @@
 from flask import Flask
 from flask_pymongo import PyMongo
 from flask_login import LoginManager
+from flask_cors import CORS
 import os
 
 app = Flask(__name__)
-
+CORS(app)
 lm = LoginManager()
 lm.init_app(app)
 app.secret_key = "password"  # os.getenv("MONGO_INITDB_ROOT_PASSWORD")
@@ -34,5 +35,4 @@ app.APP_URL = "http://127.0.0.1:5000"
 
 if __name__ == "__main__":
     app.run(debug=True, threaded=True)
-
 from app import views
