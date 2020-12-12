@@ -425,6 +425,9 @@ def get_all_collector():
         if amount != 0:
             amounts.append(amount)
             collectors.append(r["_id"])
+    if len(amounts) == 0:
+        response = {"collectors": collectors, "amounts": amounts}
+        return make_response(json.dumps(response, default=json_util.default), 200)
 
     amounts, collectors = zip(*sorted(zip(amounts, collectors), reverse = True))
 
@@ -437,13 +440,14 @@ def get_all_collector():
     else:
         collectors = collectors[offset : offset + length]
 
-    response = {"collectors": collectors, "amounts": amounts, "response": "successful"}
+    response = {"collectors": collectors, "amounts": amounts}
     return make_response(json.dumps(response, default=json_util.default), 200)
 
 @app.route("/allProduct", methods=["POST"])  # product list
 def get_all_product():
     products = []
     amounts = []
+    result = []
     offset = int(request.json.get("offset")) if request.json.get("offset") else 0
     length = int(request.json.get("length")) if request.json.get("length") else 0
     for r in app.mongo.db.user.find({"sell_list": {"$exists": "true"}}):
@@ -451,7 +455,14 @@ def get_all_product():
             amounts.append(r["sell_list"][product])
             products.append(product)
 
+    if len(amounts) == 0:
+        response = {"products": result}
+        return make_response(json.dumps(response, default=json_util.default), 200)
+
     amounts, products = zip(*sorted(zip(amounts, products), reverse = True))
+    
+    for i in range(len(amounts)):
+        result.append({"itemId": products[i],"amounts": amounts[i]})
 
     if offset > len(products):
         response = {"response": "invalid offset"}
@@ -462,7 +473,7 @@ def get_all_product():
     else:
         products = products[offset : offset + length]
 
-    response = {"products": products, "amounts": amounts, "response": "successful"}
+    response = {"products": result}
     return make_response(json.dumps(response, default=json_util.default), 200)
 
 
