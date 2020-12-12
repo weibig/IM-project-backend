@@ -603,7 +603,8 @@ def confirm_order():
 
                     # save successful transaction to blockchain
                     seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
-                    transaction_address = new_order(str(userFromSession["userId"]), seller_id, success_data, seller['wallet_address'], seller['priv_key'])
+                    buyer = app.mongo.db.user.find_one({"_id": ObjectId(userFromSession["userId"])})
+                    transaction_address = new_order(str(userFromSession["userId"]), seller_id, success_data, buyer['wallet_address'], buyer['priv_key'])
 
                     if not transaction_address:
                         response["response"] = "Failed to pay money"
@@ -645,7 +646,7 @@ def confirm_order():
 def new_order(buyer_id, seller_id, seller_buy_list, user_address, user_priv_key):
     response = {"response": ""}
     w3 = Infura().get_web3()
-    amount_in_ether = seller_buy_list['total']/10000
+    amount_in_ether = seller_buy_list['total']/100000
     amount_in_wei = w3.toWei(amount_in_ether,'ether')
 
     acct = w3.eth.account.privateKeyToAccount(user_priv_key)
@@ -751,7 +752,7 @@ def get_transaction_info(transaction_address):
 ### 轉錢失敗return False
 def pay_seller(seller_address, total_amount):
     w3 = Infura().get_web3()
-    amount_in_ether = total_amount/10000
+    amount_in_ether = total_amount/100000
     amount_in_wei = w3.toWei(amount_in_ether,'ether')
 
     acct = w3.eth.account.privateKeyToAccount('0x999028f9956d8aab71015b3a0648b3f0a512ce417d91d1e993518e4d23408eda') # 平台錢包的 private key
