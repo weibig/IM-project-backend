@@ -204,11 +204,18 @@ def remove_to_cart():
             remove_item = app.mongo.db.user.find_one_and_update(
                 filter={
                     "_id": userFromSession["userId"],
-                    "cart_list." + item_id: {"$gt": 0},
+                    "cart_list." + item_id: {"$gte": amount},
                 },
                 update={"$inc": {"cart_list." + item_id: -amount}},
             )
             if remove_item:
+                remove_empty = app.mongo.db.user.find_one_and_update(
+                    filter={
+                        "_id": userFromSession["userId"],
+                        "cart_list." + str(item_id): {"$eq": 0},
+                    },
+                    update={"$unset": {"cart_list." + str(item_id): 1}},
+                )
                 response["response"] = "Remove cart complete"
             else:
                 status_code = 400
@@ -464,14 +471,14 @@ def get_all_product():
     for i in range(len(amounts)):
         result.append({"itemId": products[i],"amounts": amounts[i]})
 
-    if offset > len(products):
+    if offset > len(result):
         response = {"response": "invalid offset"}
         return make_response(json.dumps(response), 400)
 
-    if offset + length > len(products) or length == 0:
-        products = products[offset:]
+    if offset + length > len(result) or length == 0:
+        result = result[offset:]
     else:
-        products = products[offset : offset + length]
+        result = result[offset : offset + length]
 
     response = {"products": result}
     return make_response(json.dumps(response, default=json_util.default), 200)
@@ -583,8 +590,9 @@ def confirm_order():
                 # clean cart_list TODO
                 clean_cart = app.mongo.db.product.find_one_and_update(
                     filter={"_id": ObjectId(itemId)},
-                    update={"$unset": {"cart_list": {}}},
+                    update={"$unset": {"cart_list": ""}},
                 )
+                trans = {}
                 for seller_id in buy_list.keys():
                     # update seller's inventory
                     error_product = []
@@ -593,7 +601,7 @@ def confirm_order():
                         updateInventory = app.mongo.db.user.find_one_and_update(
                             filter={
                                 "_id": ObjectId(seller_id),
-                                "sell_list." + str(product_id): {"$gt": buy_list[seller_id][product_id]}
+                                "sell_list." + str(product_id): {"$gte": buy_list[seller_id][product_id]}
                             },
                             update={"$inc": {"sell_list." + str(product_id): -int(buy_list[seller_id][product_id])}},
                         )
@@ -604,7 +612,7 @@ def confirm_order():
                     # save successful transaction to blockchain
                     seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
                     buyer = app.mongo.db.user.find_one({"_id": ObjectId(userFromSession["userId"])})
-                    transaction_address = new_order(str(userFromSession["userId"]), seller_id, success_data, buyer['wallet_address'], buyer['priv_key'])
+                    transaction_address = new_order(str(userFromSession["userId"]), str(seller_id), success_data, buyer['wallet_address'], buyer['priv_key'])
 
                     if not transaction_address:
                         response["response"] = "Failed to pay money"
@@ -621,25 +629,23 @@ def confirm_order():
                         update={"$set": {"sell_transaction." + str(transaction_address): "pending"}},
                         upsert=True
                     )
-
-
                     if len(error_product) != 0:
                         error_product_str = " ".join(error_product)
                         response["response"] = "Buying "+ seller_id + "'s " + error_product_str +" failed, other products succeed"  
                         return make_response(json.dumps(response), 400)
                     
-                    
+                    trans["seller_id"] = transaction_address
             else:
                 response["response"] = "Cart is empty"
                 return make_response(json.dumps(response), 400)
         else:
             response["response"] = "User has not logged in"
-            return make_response(json.dumps(response), 400)
-            
+            return make_response(json.dumps(response), 400)   
     else:
         response["response"] = "Authorization error"
         return make_response(json.dumps(response), 400)
 
+    response["transaction_address_list"] = trans
     return make_response(json.dumps(response), 200)
 
 # 將user['buy_list']存進block 回傳transaction's address, 同時由買家錢包轉錢至平台錢包
