@@ -492,6 +492,8 @@ def get_user_info():
         balance = get_wallet_balance(response['wallet_address'])
         response["response"] = "successful"
         response["balance"] = str(balance)
+        response.pop('password_hash', None)
+        response.pop('priv_key', None)
         return make_response(json.dumps(response, default=json_util.default), 200)
 
     response["response"] = "User ID is not found"
