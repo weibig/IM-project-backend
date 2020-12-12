@@ -580,7 +580,7 @@ def confirm_order():
                         buy_list[checkProduct["owner"]]["total"] = (
                             checkProduct["price"] * amount
                         )
-                # clean cart_list
+                # clean cart_list TODO
                 clean_cart = app.mongo.db.product.find_one_and_update(
                     filter={"_id": ObjectId(itemId)},
                     update={"$unset": {"cart_list": {}}},
@@ -706,7 +706,7 @@ def confirm_receive():
                 return make_response(json.dumps(response), 400)
 
             buyer_id, seller_id, data, total_amount = get_transaction_info(transaction_address)
-            seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id["$oid"])})
+            seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
             if not seller:
                 response["response"] = "Owner not found"+str(seller_id)
                 return make_response(json.dumps(response), 400)
@@ -718,9 +718,13 @@ def confirm_receive():
             
             # seller receive money
             updateSellTransaction = app.mongo.db.user.find_one_and_update(
-                filter={"_id": userFromSession["userId"]},
-                update={"$set": {"buy_transaction." + str(transaction_address): "received"}}
+                filter={"_id": ObjectId(seller_id)},
+                update={"$set": {"sell_transaction." + str(transaction_address): "received"}}
             )
+            if not updateSellTransaction:
+                response["response"] = "Failed to update seller's transaction"
+                return make_response(json.dumps(response), 400)
+
         else:
             response["response"] = "User has not logged in"
             return make_response(json.dumps(response), 400)
