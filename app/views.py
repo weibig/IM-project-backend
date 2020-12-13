@@ -27,6 +27,10 @@ def login():
         return make_response(json.dumps(response), 400)
 
     user = app.mongo.db.user.find_one({"username": username})
+    if not user:
+        response["response"] = "Please register first"
+        return make_response(json.dumps(response), 400) 
+
     if user and User.validate_login(user["password_hash"], password):
         user_obj = User.build_user(user)
         session["uid"] = str(uuid.uuid4())
@@ -253,8 +257,8 @@ def add_product():
         description = ""
 
     # create item
-    if name is None or price is None or name == "" or price == "":
-        response["response"] = "item's name or price is not provided"
+    if name is None or price is None or amount is None or name == "" or price == "" or amount == "":
+        response["response"] = "item's name or price or amount is not provided"
         return make_response(json.dumps(response), 400)
 
     product = Product(
