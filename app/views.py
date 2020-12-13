@@ -754,6 +754,24 @@ def get_transaction_info(transaction_address):
     total_amount = json_data['data']['total']
     return buyer_id, seller_id, data, total_amount
 
+@app.route("/getTransactionInfo", methods=["POST"])
+def getTransactionInfo():
+    response = {}
+    transaction_address = request.json.get("transaction_address")
+    w3 = Infura().get_web3()
+    input_data = w3.eth.getTransaction(transaction_address)['input']
+    input_data_decode = codecs.decode(input_data[2:], 'hex')
+    json_data = json.loads(input_data_decode.decode('utf-8'))
+
+    seller_id = json_data['seller']
+    data = json_data['data']
+    total_amount = json_data['data']['total']
+    response['seller_id'] = seller_id
+    response['data'] = data
+    response['response'] = 'successful'
+
+    return make_response(json.dumps(response),200)
+
 # 由平台錢包轉錢至賣家錢包
 ### 轉錢失敗return False
 def pay_seller(seller_address, total_amount):
