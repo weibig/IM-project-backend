@@ -14,6 +14,7 @@ from eth_keys import keys
 from mnemonic import Mnemonic
 import codecs as codecs
 import requests
+from datetime import datetime
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -621,12 +622,12 @@ def confirm_order():
                     # store transaction address to seller's and buyer's list
                     updateBuyTransaction = app.mongo.db.user.find_one_and_update(
                         filter={"_id": userFromSession["userId"]},
-                        update={"$set": {"buy_transaction." + str(transaction_address): "pending"}},
+                        update={"$push": {"buy_transaction": {"created_time": datetime.now(), "address": str(transaction_address), "status": "pending","received_time": None}}},
                         upsert=True
                     )
                     updateSellTransaction = app.mongo.db.user.find_one_and_update(
                         filter={"_id": ObjectId(seller_id)},
-                        update={"$set": {"sell_transaction." + str(transaction_address): "pending"}},
+                        update={"$push": {"sell_transaction": {"created_time": datetime.now(), "address": str(transaction_address), "status": "pending","received_time": None}}},
                         upsert=True
                     )
                     if len(error_product) != 0:
@@ -634,7 +635,7 @@ def confirm_order():
                         response["response"] = "Buying "+ seller_id + "'s " + error_product_str +" failed, other products succeed"  
                         return make_response(json.dumps(response), 400)
                     
-                    trans["seller_id"] = transaction_address
+                    trans[str(seller_id)] = transaction_address
             else:
                 response["response"] = "Cart is empty"
                 return make_response(json.dumps(response), 400)
@@ -677,7 +678,7 @@ def new_order(buyer_id, seller_id, seller_buy_list, user_address, user_priv_key)
     
     ## 轉錢不成功 false
     current_balance = get_wallet_balance(user_address)
-    if int(current_balance) < amount_in_ether:
+    if float(current_balance) < float(amount_in_ether):
         return False
 
     txn_hash = w3.eth.sendRawTransaction(signed_txn.rawTransaction)
@@ -705,8 +706,8 @@ def confirm_receive():
         if userFromSession:
             # buyer receive product
             updateBuyTransaction = app.mongo.db.user.find_one_and_update(
-                filter={"_id": userFromSession["userId"]},
-                update={"$set": {"buy_transaction." + str(transaction_address): "received"}}
+                filter={"_id": userFromSession["userId"],"buy_transaction.address":str(transaction_address)},
+                update={"$set": {"buy_transaction.$.status": "received","buy_transaction.$.received_time": datetime.now()}}
             )
             if not updateBuyTransaction:
                 response["response"] = "User has no authentication"
@@ -715,7 +716,7 @@ def confirm_receive():
             buyer_id, seller_id, data, total_amount = get_transaction_info(transaction_address)
             seller = app.mongo.db.user.find_one({"_id": ObjectId(seller_id)})
             if not seller:
-                response["response"] = "Owner not found"+str(seller_id)
+                response["response"] = "Owner not found"
                 return make_response(json.dumps(response), 400)
             paidMoney = pay_seller(seller['wallet_address'], total_amount)
             
@@ -725,8 +726,8 @@ def confirm_receive():
             
             # seller receive money
             updateSellTransaction = app.mongo.db.user.find_one_and_update(
-                filter={"_id": ObjectId(seller_id)},
-                update={"$set": {"sell_transaction." + str(transaction_address): "received"}}
+                filter={"_id": ObjectId(seller_id),"sell_transaction.address":str(transaction_address)},
+                update={"$set": {"sell_transaction.$.status": "received","sell_transaction.$.received_time": datetime.now()}}
             )
             if not updateSellTransaction:
                 response["response"] = "Failed to update seller's transaction"
@@ -773,7 +774,7 @@ def pay_seller(seller_address, total_amount):
     }
     
     current_balance = get_wallet_balance('0x12CaAe9aAF2bAEdB11471678232ad73bEF5C2889')
-    if int(current_balance) < amount_in_ether:
+    if float(current_balance) < float(amount_in_ether):
         return False
 
     signed_txn = acct.signTransaction(txn_dict)

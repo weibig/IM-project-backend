@@ -13,8 +13,8 @@ class User:
         self.password_hash = None
         self.wallet_address = None
         self.priv_key = None
-        self.buy_transaction = {} # {tid: status}
-        self.sell_transaction = {} # {tid: status}
+        self.buy_transaction = [] # ["time":time, "address":tid, "status":status]
+        self.sell_transaction = [] # ["time":time, "address":tid, "status":status]
         self.cart_list = {} # {pid: amount}
         # self.buy_list = {} # {seller: {pid:amount,total:price}}
         self.sell_list = {} # {pid: amount}
