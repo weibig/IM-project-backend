@@ -622,12 +622,12 @@ def confirm_order():
                     # store transaction address to seller's and buyer's list
                     updateBuyTransaction = app.mongo.db.user.find_one_and_update(
                         filter={"_id": userFromSession["userId"]},
-                        update={"$push": {"buy_transaction": {"created_time": datetime.now(), "address": str(transaction_address), "status": "pending","received_time": None}}},
+                        update={"$push": {"buy_transaction": {"created_time": datetime.now().strftime('%Y/%m/%d %H:%M'), "address": str(transaction_address), "status": "pending","received_time": None}}},
                         upsert=True
                     )
                     updateSellTransaction = app.mongo.db.user.find_one_and_update(
                         filter={"_id": ObjectId(seller_id)},
-                        update={"$push": {"sell_transaction": {"created_time": datetime.now(), "address": str(transaction_address), "status": "pending","received_time": None}}},
+                        update={"$push": {"sell_transaction": {"created_time": datetime.now().strftime('%Y/%m/%d %H:%M'), "address": str(transaction_address), "status": "pending","received_time": None}}},
                         upsert=True
                     )
                     if len(error_product) != 0:
@@ -707,7 +707,7 @@ def confirm_receive():
             # buyer receive product
             updateBuyTransaction = app.mongo.db.user.find_one_and_update(
                 filter={"_id": userFromSession["userId"],"buy_transaction.address":str(transaction_address)},
-                update={"$set": {"buy_transaction.$.status": "received","buy_transaction.$.received_time": datetime.now()}}
+                update={"$set": {"buy_transaction.$.status": "received","buy_transaction.$.received_time": datetime.now().strftime('%Y/%m/%d %H:%M')}}
             )
             if not updateBuyTransaction:
                 response["response"] = "User has no authentication"
@@ -727,7 +727,7 @@ def confirm_receive():
             # seller receive money
             updateSellTransaction = app.mongo.db.user.find_one_and_update(
                 filter={"_id": ObjectId(seller_id),"sell_transaction.address":str(transaction_address)},
-                update={"$set": {"sell_transaction.$.status": "received","sell_transaction.$.received_time": datetime.now()}}
+                update={"$set": {"sell_transaction.$.status": "received","sell_transaction.$.received_time": datetime.now().strftime('%Y/%m/%d %H:%M')}}
             )
             if not updateSellTransaction:
                 response["response"] = "Failed to update seller's transaction"
