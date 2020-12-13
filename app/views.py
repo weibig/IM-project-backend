@@ -514,7 +514,7 @@ def get_user_info():
 def get_wallet_balance(wallet_address):
     w3 = Infura().get_web3()
     balance = w3.eth.getBalance(wallet_address)
-    eth_balance = w3.fromWei(balance, 'ether');
+    eth_balance = w3.fromWei(balance, 'ether')
     return eth_balance
 
 @app.route("/itemInfo", methods=["POST"])
@@ -593,11 +593,10 @@ def confirm_order():
                             checkProduct["price"] * amount
                         )
                 # clean cart_list TODO
-                clean_cart = app.mongo.db.product.find_one_and_update(
-                    filter={"_id": ObjectId(itemId)},
-                    update={"$unset": {"cart_list": ""}},
+                clean_cart = app.mongo.db.user.find_one_and_update(
+                    filter={"_id": ObjectId(userFromSession["userId"])},
+                    update={"$set": {"cart_list": {}}},
                 )
-                trans = {}
                 for seller_id in buy_list.keys():
                     # update seller's inventory
                     error_product = []
@@ -639,7 +638,6 @@ def confirm_order():
                         response["response"] = "Buying "+ seller_id + "'s " + error_product_str +" failed, other products succeed"  
                         return make_response(json.dumps(response), 400)
                     
-                    trans[str(seller_id)] = transaction_address
             else:
                 response["response"] = "Cart is empty"
                 return make_response(json.dumps(response), 400)
@@ -650,7 +648,6 @@ def confirm_order():
         response["response"] = "Authorization error"
         return make_response(json.dumps(response), 400)
 
-    response["transaction_address_list"] = trans
     return make_response(json.dumps(response), 200)
 
 # 將user['buy_list']存進block 回傳transaction's address, 同時由買家錢包轉錢至平台錢包
