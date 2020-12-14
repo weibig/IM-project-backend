@@ -19,7 +19,7 @@ app.secret_key = "password"  # os.getenv("MONGO_INITDB_ROOT_PASSWORD")
 
 app.config["MONGO_URI"] = "mongodb+srv://weibig:wendy0223@cluster0.dx9k9.mongodb.net/test?retryWrites=true&w=majority"
 app.mongo = PyMongo(app)
-app.APP_URL = "http://127.0.0.1:5000"
+app.APP_URL = "http://0.0.0.0:5000"
 
 # Example of how to create index on startup
 #
