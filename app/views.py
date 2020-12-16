@@ -775,7 +775,7 @@ def getTransactionInfo():
             all_product_list.append(one_product)
     response["products"] = all_product_list
     response["total_price"] = data["total"]
-    response["seller_id"] = all_data["seller"]
+    response["seller_id"] = json_data["seller"]
     response["response"] = "successful"
 
     return make_response(json.dumps(response),200)
