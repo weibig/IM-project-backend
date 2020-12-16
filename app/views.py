@@ -765,12 +765,18 @@ def getTransactionInfo():
     input_data_decode = codecs.decode(input_data[2:], 'hex')
     json_data = json.loads(input_data_decode.decode('utf-8'))
 
-    seller_id = json_data['seller']
-    data = json_data['data']
-    total_amount = json_data['data']['total']
-    response['seller_id'] = seller_id
-    response['data'] = data
-    response['response'] = 'successful'
+    data = json_data["data"]
+    all_product_list = []
+    for k in data.keys():
+        if k != "total":
+            one_product = {}
+            one_product['id'] = k
+            one_product['amount'] = data[k]
+            all_product_list.append(one_product)
+    response["products"] = all_product_list
+    response["total_price"] = data["total"]
+    response["seller_id"] = all_data["seller"]
+    response["response"] = "successful"
 
     return make_response(json.dumps(response),200)
 
