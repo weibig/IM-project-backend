@@ -331,6 +331,7 @@ def revise_product():
     item_id = ObjectId(item_id)
     # set up updated item
     updated_item = {}
+    new_amount = -1
     if name:
         updated_item["name"] = name
     if image_urls:
@@ -340,7 +341,7 @@ def revise_product():
     if price:
         updated_item["price"] = price
     if amount:
-        updated_item["amount"] = amount
+        new_amount = amount
 
     # check user auth
     if api_key:
@@ -365,6 +366,10 @@ def revise_product():
             else:
                 status_code = 400
                 response["response"] = "Revise product error"
+            if amount != -1:
+                revise_item = app.mongo.db.user.find_one_and_update(
+                filter={"_id": userFromSession["userId"]}, update={"$set": {"sell_list." + str(item_id): new_amount}}
+            )
         else:
             response["response"] = "User has no authentication"
     else:
