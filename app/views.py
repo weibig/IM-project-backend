@@ -334,7 +334,6 @@ def revise_product():
     if item_id is None or (not ObjectId.is_valid(item_id)):
         response["response"] = "item's id is not provided"
         return make_response(json.dumps(response), 400)
-    item_id = ObjectId(item_id)
     # set up updated item
     updated_item = {}
     new_amount = -1
@@ -360,23 +359,30 @@ def revise_product():
             {"session_id": api_key})
         if userFromSession:
             isOwner = app.mongo.db.product.find_one(
-                {"_id": item_id, "owner": userFromSession["userId"]}
+                {"_id": ObjectId(item_id), "owner": userFromSession["userId"]}
             )
         else:
             isOwner = False
         if userFromSession and isOwner:
-            revise_item = app.mongo.db.product.find_one_and_update(
-                filter={"_id": item_id}, update={"$set": updated_item}
-            )
-            if revise_item:
-                response["response"] = "Revise product complete"
-            else:
-                status_code = 400
-                response["response"] = "Revise product error"
+            if updated_item != {}:
+                revise_item = app.mongo.db.product.find_one_and_update(
+                    filter={"_id": ObjectId(item_id)}, update={"$set": updated_item}
+                )
+                if revise_item:
+                    response["response"] = "Revise product complete"
+                else:
+                    status_code = 400
+                    response["response"] = "Revise product error"
             if amount != -1:
-                revise_item = app.mongo.db.user.find_one_and_update(
-                filter={"_id": userFromSession["userId"]}, update={"$set": {"sell_list." + str(item_id): new_amount}}
-            )
+                revise_amount = app.mongo.db.user.find_one_and_update(
+                    filter={"_id": userFromSession["userId"]}, 
+                    update={"$set": {"sell_list." + item_id: new_amount}}
+                )
+                if revise_amount:
+                    response["response"] = "Revise product and amount complete"
+                else:
+                    status_code = 400
+                    response["response"] = "Revise amount error"
         else:
             response["response"] = "User has no authentication"
     else:
